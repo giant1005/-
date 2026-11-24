@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>國立暨南國際大學 教育學院 A棟 4F 消防設備防災及設備通報系統</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <!-- Google Fonts: Noto Sans TC & Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <!-- QR Code 產生器函式庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', '"Inter"', 'sans-serif'],
+          },
+          colors: {
+            ncnuBlue: '#0F294A',
+            safetyOrange: '#F95700',
+            safetyRed: '#DC2626',
+            escapeGreen: '#16A34A',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      font-family: 'Noto Sans TC', 'Inter', sans-serif;
+      background-color: #e2e8f0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 綠色逃生路徑流動虛線動畫 */
+    @keyframes dashFlow {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+    .escape-route-animated {
+      stroke-dasharray: 8 4;
+      animation: dashFlow 0.8s linear infinite;
+    }
+
+    /* 設備篩選高亮脈衝動畫 */
+    @keyframes markerPulse {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(220, 38, 38, 0.85));
+      }
+      50% {
+        transform: scale(1.4);
+        filter: drop-shadow(0 0 9px rgba(250, 204, 21, 1));
+      }
+    }
+    .marker-highlight {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: markerPulse 0.85s ease-in-out infinite;
+    }
+
+    /* 火焰搖曳動畫（小遊戲） */
+    @keyframes flameFlicker {
+      0%, 100% { transform: scale(1) rotate(-2deg); }
+      50% { transform: scale(1.08) rotate(2deg); }
+    }
+    .flame-anim {
+      transform-origin: bottom center;
+      animation: flameFlicker 0.5s ease-in-out infinite;
+    }
+
+    /* 緊急警鈴閃爍 */
+    @keyframes sirenFlash {
+      0%, 100% { background-color: #dc2626; }
+      50% { background-color: #991b1b; }
+    }
+    .siren-active {
+      animation: sirenFlash 0.45s infinite;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-orange-200">
+
+  <!-- 主應用程式容器（自適應手機與平板/桌面） -->
+  <div class="max-w-4xl mx-auto min-h-screen bg-slate-50 shadow-2xl flex flex-col relative">
+
+    <!-- 1. 頂部學校識別與 QR Code 貼紙預覽列 -->
+    <header class="bg-ncnuBlue text-white px-4 py-3 flex items-center justify-between border-b border-slate-700 sticky top-0 z-40">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-amber-400 font-black text-xl shadow-inner shrink-0">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <p class="text-[11px] text-sky-200 tracking-wider font-medium">國立暨南國際大學 校安防災系統</p>
+          <h1 class="text-sm sm:text-base font-black tracking-tight leading-tight">教育學院消防防災與設備通報系統</h1>
+        </div>
+      </div>
+      <button onclick="openQrModal()" class="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition cursor-pointer shrink-0">
+        <i class="fa-solid fa-qrcode text-sm"></i>
+        <span>QR Code 貼紙預覽</span>
+      </button>
+    </header>
+
+    <!-- 2. 橘紅色定位與緊急求救橫幅 -->
+    <section class="bg-gradient-to-r from-[#F95700] to-[#DC2626] text-white px-4 py-3.5 shadow-md">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-full bg-white text-red-600 flex items-center justify-center shadow text-lg shrink-0">
+            <i class="fa-solid fa-location-dot"></i>
+          </span>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-[11px] bg-black/25 px-2.5 py-0.5 rounded-full font-bold">目前 QR 掃描定位</span>
+              <span id="liveClock" class="text-xs font-mono text-orange-100">2026/11/24 22:34</span>
+            </div>
+            <h2 id="currentLocationTitle" class="text-base sm:text-xl font-black tracking-wide drop-shadow-xs mt-0.5">
+              📍 你的位置：教育學院 A棟 4F
+            </h2>
+          </div>
+        </div>
+
+        <!-- 樓層快速預覽切換器（預設鎖定 4F） -->
+        <div class="flex items-center gap-1.5 bg-black/20 px-2.5 py-1.5 rounded-xl text-xs">
+          <label for="floorSelector" class="text-orange-100 whitespace-nowrap font-medium"><i class="fa-solid fa-layer-group mr-1"></i>樓層切換：</label>
+          <select id="floorSelector" onchange="handleFloorChange(this.value)" class="bg-white text-slate-900 font-bold rounded-lg px-2 py-1 text-xs focus:outline-none cursor-pointer">
+            <option value="4F" selected>教育學院 A棟 4F (預設)</option>
+            <option value="3F">教育學院 A棟 3F (模擬)</option>
+            <option value="2F">教育學院 A棟 2F (模擬)</option>
+            <option value="1F">教育學院 A棟 1F (模擬)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 緊急求救鈴與災時受困快速回報列 -->
+      <div class="mt-3 pt-2.5 border-t border-white/25 flex flex-wrap items-center justify-between gap-2">
+        <button id="alarmBellBtn" onclick="toggleEmergencyBell()" class="flex-1 min-w-[180px] bg-red-800 hover:bg-red-900 active:scale-98 text-white font-black py-2 px-3.5 rounded-xl shadow-md border border-red-400/40 flex items-center justify-center gap-2 text-xs sm:text-sm transition cursor-pointer">
+          <i class="fa-solid fa-bell text-amber-300"></i>
+          <span id="alarmBellText">求救鈴（啟動高頻警示音）</span>
+        </button>
+        <button onclick="switchTab('report', 'trapped')" class="bg-white text-red-700 hover:bg-red-50 active:scale-98 font-black py-2 px-3.5 rounded-xl shadow-md flex items-center justify-center gap-1.5 text-xs sm:text-sm transition cursor-pointer whitespace-nowrap">
+          <i class="fa-solid fa-person-circle-exclamation"></i>
+          <span>受困人數回報</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. 四大功能分頁導航列 -->
+    <nav class="bg-white border-b border-slate-200 px-3 py-2 sticky top-[64px] z-30 shadow-xs">
+      <div class="grid grid-cols-4 gap-1.5">
+        <button onclick="switchTab('map')" id="tab-btn-map" class="tab-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-2 px-2 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer bg-ncnuBlue text-white shadow">
+          <span>🗺️</span>
+          <span>消防逃生圖</span>
+        </button>
+        <button onclick="switchTab('report', 'equipment')" id="tab-btn-report" class="tab-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-2 px-2 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer bg-slate-100 text-slate-700 hover:bg-slate-200">
+          <span>🛠️</span>
+          <span>異常 / 受困通報</span>
+        </button>
+        <button onclick="switchTab('guide')" id="tab-btn-guide" class="tab-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-2 px-2 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer bg-slate-100 text-slate-700 hover:bg-slate-200">
+          <span>📢</span>
+          <span>防災宣導</span>
+        </button>
+        <button onclick="switchTab('game')" id="tab-btn-game" class="tab-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-2 px-2 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer bg-slate-100 text-slate-700 hover:bg-slate-200">
+          <span>📝</span>
+          <span>防災減災測驗</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- 4. 主內容區塊 -->
+    <main class="flex-1 p-3 sm:p-5 space-y-4">
+
+      <!-- =================================================================== -->
+      <!-- 分頁一：教育學院 A 棟 4F 消防設備及逃生路線平面圖（預設顯示）         -->
+      <!-- =================================================================== -->
+      <section id="view-map" class="tab-view space-y-3">
+        <div class="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200 space-y-3">
+          <!-- 深藍標題橫幅 -->
+          <div class="bg-ncnuBlue text-white rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <h3 id="mapHeaderTitle" class="text-sm sm:text-lg font-black tracking-wide">
+              教育學院 A 棟 4F 防災設備分布圖
+            </h3>
+            <span class="text-[11px] bg-white/15 px-2.5 py-0.5 rounded-full text-sky-100 font-medium">
+              點擊設備圖示可查看資訊與通報
+            </span>
+          </div>
+
+          <!-- 水平橫向圖例篩選列（置於平面圖上方，避免直排與跑位） -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <button type="button" id="filter-ext" onclick="toggleFilter('ext')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="w-3 h-3 rounded-full bg-red-600 inline-block shrink-0"></span>
+              <span>滅火器</span>
+              <span class="bg-red-100 text-red-700 px-1.5 py-0.2 rounded-md font-black">16支</span>
+            </button>
+            <button type="button" id="filter-hyd" onclick="toggleFilter('hyd')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="w-3.5 h-2.5 rounded-xs border-2 border-red-600 bg-white inline-block shrink-0"></span>
+              <span>消防栓</span>
+              <span class="bg-red-100 text-red-700 px-1.5 py-0.2 rounded-md font-black">3個</span>
+            </button>
+            <button type="button" id="filter-wat" onclick="toggleFilter('wat')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="w-3 h-3 rounded-xs bg-amber-400 inline-block shrink-0"></span>
+              <span>飲水機</span>
+              <span class="bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-md font-black">2台</span>
+            </button>
+            <button type="button" id="filter-esc" onclick="toggleFilter('esc')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="w-3 h-3 rounded-full bg-blue-600 inline-block shrink-0"></span>
+              <span>逃生梯</span>
+              <span class="bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-md font-black">4座</span>
+            </button>
+            <button type="button" id="filter-stair" onclick="toggleFilter('stair')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <i class="fa-solid fa-stairs text-slate-700"></i>
+              <span>樓梯</span>
+              <span class="bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded-md font-black">3座</span>
+            </button>
+            <button type="button" id="filter-sos" onclick="toggleFilter('sos')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="bg-red-600 text-white text-[10px] font-black px-1 rounded">SOS</span>
+              <span>緊急電話</span>
+              <span class="bg-red-100 text-red-700 px-1.5 py-0.2 rounded-md font-black">2台</span>
+            </button>
+            <button type="button" id="filter-elev" onclick="toggleFilter('elev')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="w-3 h-3 rounded-xs bg-lime-500 inline-block shrink-0"></span>
+              <span>電梯(禁搭)</span>
+              <span class="bg-lime-100 text-lime-900 px-1.5 py-0.2 rounded-md font-black">1座</span>
+            </button>
+            <button type="button" id="filter-restroom" onclick="toggleFilter('restroom')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 font-bold text-slate-800 whitespace-nowrap transition cursor-pointer">
+              <span class="w-3 h-3 rounded-xs bg-sky-300 border border-sky-500 inline-block shrink-0"></span>
+              <span>廁所</span>
+              <span class="bg-sky-100 text-sky-900 px-1.5 py-0.2 rounded-md font-black">2間</span>
+            </button>
+            <button type="button" id="filter-route" onclick="toggleFilter('route')" class="filter-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-bold text-emerald-900 whitespace-nowrap transition cursor-pointer">
+              <i class="fa-solid fa-arrow-right text-emerald-600"></i>
+              <span>逃生路線</span>
+              <span class="bg-emerald-600 text-white text-[10px] px-1.5 py-0.2 rounded-md font-black">動態指引</span>
+            </button>
+          </div>
+
+          <!-- 縮放控制列 -->
+          <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <span class="text-xs font-bold text-slate-600">
+              <i class="fa-solid fa-hand-pointer text-orange-500 mr-1"></i>平面圖檢視比例
+            </span>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="zoomMap(-0.2)" class="w-8 h-8 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-black text-slate-800 flex items-center justify-center cursor-pointer">-</button>
+              <span id="zoomLevelLabel" class="text-xs font-mono font-black text-slate-700 min-w-[44px] text-center">100%</span>
+              <button type="button" onclick="zoomMap(0.2)" class="w-8 h-8 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-black text-slate-800 flex items-center justify-center cursor-pointer">+</button>
+              <button type="button" onclick="resetMapZoom()" class="px-2.5 h-8 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs font-bold text-slate-700 cursor-pointer">重設</button>
+            </div>
+          </div>
+
+          <!-- 教育學院 A 棟 4F 平面配置圖 SVG 容器 -->
+          <div id="mapScrollContainer" class="w-full overflow-x-auto flex justify-center rounded-xl border border-slate-200 bg-white p-2">
+            <svg id="floorPlanSvg" viewBox="0 0 900 560" class="w-full max-w-[900px] h-auto select-none">
+              <defs>
+                <!-- 廁所斜線底紋 -->
+                <pattern id="restroomStripe" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#e0f2fe" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#7dd3fc" stroke-width="3" />
+                </pattern>
+                <!-- 電梯斜線底紋 -->
+                <pattern id="elevatorStripe" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#ecfccb" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#84cc16" stroke-width="3" />
+                </pattern>
+                <!-- 綠色逃生箭頭標記 -->
+                <marker id="greenArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#16a34a" />
+                </marker>
+              </defs>
+
+              <!-- 外框建築牆體 -->
+              <rect x="24" y="20" width="852" height="476" fill="#ffffff" stroke="#0f172a" stroke-width="4" />
+
+              <!-- 左側三間教室 -->
+              <g stroke="#0f172a" stroke-width="2.5" fill="#ffffff">
+                <rect x="24" y="20" width="112" height="112" />
+                <line x1="24" y1="20" x2="136" y2="132" stroke-width="1.5" />
+                <line x1="136" y1="20" x2="24" y2="132" stroke-width="1.5" />
+
+                <rect x="24" y="132" width="112" height="122" />
+                <line x1="24" y1="132" x2="136" y2="254" stroke-width="1.5" />
+                <line x1="136" y1="132" x2="24" y2="254" stroke-width="1.5" />
+
+                <rect x="24" y="254" width="112" height="122" />
+                <line x1="24" y1="254" x2="136" y2="376" stroke-width="1.5" />
+                <line x1="136" y1="254" x2="24" y2="376" stroke-width="1.5" />
+              </g>
+              <g font-size="15" font-weight="800" fill="#0f172a" text-anchor="middle">
+                <text x="80" y="82">教室</text>
+                <text x="80" y="198">教室</text>
+                <text x="80" y="320">教室</text>
+              </g>
+              <!-- 左側第一間教室門扇 -->
+              <path d="M 136 58 A 26 26 0 0 1 136 110" fill="none" stroke="#0f172a" stroke-width="2" />
+              <line x1="136" y1="58" x2="136" y2="110" stroke="#ffffff" stroke-width="3" />
+
+              <!-- 中左兩間教室 -->
+              <g stroke="#0f172a" stroke-width="2.5" fill="#ffffff">
+                <rect x="192" y="20" width="112" height="118" />
+                <line x1="192" y1="20" x2="304" y2="138" stroke-width="1.5" />
+                <line x1="304" y1="20" x2="192" y2="138" stroke-width="1.5" />
+
+                <rect x="192" y="138" width="112" height="134" />
+                <line x1="192" y1="138" x2="304" y2="272" stroke-width="1.5" />
+                <line x1="304" y1="138" x2="192" y2="272" stroke-width="1.5" />
+              </g>
+              <g font-size="15" font-weight="800" fill="#0f172a" text-anchor="middle">
+                <text x="248" y="84">教室</text>
+                <text x="248" y="210">教室</text>
+              </g>
+              <!-- 中左教室下方門扇 -->
+              <path d="M 222 272 A 22 22 0 0 1 244 294" fill="none" stroke="#0f172a" stroke-width="2" />
+              <line x1="222" y1="272" x2="244" y2="272" stroke="#ffffff" stroke-width="3" />
+
+              <!-- 中央休息區與半圓形主樓梯（往 3F） -->
+              <text x="450" y="64" font-size="22" font-weight="900" fill="#0f172a" text-anchor="middle" letter-spacing="10">休息區</text>
+
+              <g class="equip-stair cursor-pointer" onclick="selectEquipment('STAIR-CENTER')">
+                <path d="M 358 274 A 92 92 0 0 1 542 274 L 542 286 L 358 286 Z" fill="#f8fafc" stroke="#0f172a" stroke-width="2.5" />
+                <!-- 階梯線 -->
+                <g stroke="#334155" stroke-width="1.2">
+                  <line x1="370" y1="228" x2="404" y2="246" />
+                  <line x1="386" y1="204" x2="414" y2="228" />
+                  <line x1="408" y1="188" x2="428" y2="218" />
+                  <line x1="434" y1="183" x2="442" y2="214" />
+                  <line x1="466" y1="183" x2="458" y2="214" />
+                  <line x1="492" y1="188" x2="472" y2="218" />
+                  <line x1="514" y1="204" x2="486" y2="228" />
+                  <line x1="530" y1="228" x2="496" y2="246" />
+                  <line x1="358" y1="256" x2="398" y2="256" />
+                  <line x1="502" y1="256" x2="542" y2="256" />
+                  <line x1="358" y1="270" x2="398" y2="270" />
+                  <line x1="502" y1="270" x2="542" y2="270" />
+                </g>
+                <!-- 半圓樓梯中央暗部 -->
+                <path d="M 418 286 L 418 244 A 32 32 0 0 1 482 244 L 482 286 Z" fill="#0f172a" />
+                <text x="488" y="214" font-size="15" font-weight="900" fill="#16a34a">3F</text>
+              </g>
+
+              <!-- 中右兩間教室 + 電梯 -->
+              <g stroke="#0f172a" stroke-width="2.5" fill="#ffffff">
+                <rect x="576" y="20" width="104" height="118" />
+                <line x1="576" y1="20" x2="680" y2="138" stroke-width="1.5" />
+                <line x1="680" y1="20" x2="576" y2="138" stroke-width="1.5" />
+
+                <rect x="576" y="138" width="104" height="134" />
+                <line x1="576" y1="138" x2="680" y2="272" stroke-width="1.5" />
+                <line x1="680" y1="138" x2="576" y2="272" stroke-width="1.5" />
+
+                <rect x="680" y="20" width="84" height="176" />
+                <line x1="680" y1="20" x2="764" y2="196" stroke-width="1.5" />
+                <line x1="764" y1="20" x2="680" y2="196" stroke-width="1.5" />
+              </g>
+              <g font-size="15" font-weight="800" fill="#0f172a" text-anchor="middle">
+                <text x="628" y="84">教室</text>
+                <text x="628" y="210">教室</text>
+                <text x="722" y="114">教室</text>
+              </g>
+              <!-- 右上方教室門扇 -->
+              <path d="M 764 58 A 26 26 0 0 0 764 110" fill="none" stroke="#0f172a" stroke-width="2" />
+              <line x1="764" y1="58" x2="764" y2="110" stroke="#ffffff" stroke-width="3" />
+              <!-- 中右教室下方門扇 -->
+              <path d="M 650 272 A 22 22 0 0 0 672 294" fill="none" stroke="#0f172a" stroke-width="2" />
+              <line x1="650" y1="272" x2="672" y2="272" stroke="#ffffff" stroke-width="3" />
+
+              <!-- 電梯（禁搭） -->
+              <g class="equip-elev cursor-pointer" onclick="selectEquipment('ELEV-01')">
+                <rect x="680" y="196" width="84" height="76" fill="url(#elevatorStripe)" stroke="#0f172a" stroke-width="2.5" />
+                <text x="722" y="240" font-size="16" font-weight="900" fill="#0f172a" text-anchor="middle">電梯</text>
+              </g>
+
+              <!-- 右側三間教室 -->
+              <g stroke="#0f172a" stroke-width="2.5" fill="#ffffff">
+                <rect x="796" y="20" width="80" height="112" />
+                <line x1="796" y1="20" x2="876" y2="132" stroke-width="1.5" />
+                <line x1="876" y1="20" x2="796" y2="132" stroke-width="1.5" />
+
+                <rect x="796" y="132" width="80" height="122" />
+                <line x1="796" y1="132" x2="876" y2="254" stroke-width="1.5" />
+                <line x1="876" y1="132" x2="796" y2="254" stroke-width="1.5" />
+
+                <rect x="796" y="254" width="80" height="122" />
+                <line x1="796" y1="254" x2="876" y2="376" stroke-width="1.5" />
+                <line x1="876" y1="254" x2="796" y2="376" stroke-width="1.5" />
+              </g>
+              <g font-size="15" font-weight="800" fill="#0f172a" text-anchor="middle">
+                <text x="836" y="82">教室</text>
+                <text x="836" y="198">教室</text>
+                <text x="836" y="320">教室</text>
+              </g>
+
+              <!-- 下方區域：左逃生樓梯、左廁所、四間教室、右廁所、右逃生樓梯 -->
+              <!-- 左側逃生樓梯 -->
+              <g class="equip-stair cursor-pointer" onclick="selectEquipment('STAIR-LEFT')">
+                <rect x="136" y="376" width="68" height="120" fill="#ffffff" stroke="#0f172a" stroke-width="2.5" />
+                <line x1="170" y1="376" x2="170" y2="496" stroke="#0f172a" stroke-width="2" />
+                <g stroke="#334155" stroke-width="1.2">
+                  <line x1="136" y1="393" x2="170" y2="393" /><line x1="136" y1="409" x2="170" y2="409" />
+                  <line x1="136" y1="425" x2="170" y2="425" /><line x1="136" y1="441" x2="170" y2="441" />
+                  <line x1="136" y1="457" x2="170" y2="457" /><line x1="136" y1="473" x2="170" y2="473" />
+                  <line x1="170" y1="393" x2="204" y2="393" /><line x1="170" y1="409" x2="204" y2="409" />
+                  <line x1="170" y1="425" x2="204" y2="425" /><line x1="170" y1="441" x2="204" y2="441" />
+                  <line x1="170" y1="457" x2="204" y2="457" /><line x1="170" y1="473" x2="204" y2="473" />
+                </g>
+              </g>
+              <text x="170" y="516" font-size="14" font-weight="900" fill="#14532d" text-anchor="middle">3F</text>
+              <text x="170" y="532" font-size="12" font-weight="800" fill="#14532d" text-anchor="middle">(樓梯往下)</text>
+
+              <!-- 左側廁所 -->
+              <g class="equip-restroom cursor-pointer" onclick="selectEquipment('HYD-4F-01')">
+                <rect x="204" y="376" width="114" height="120" fill="url(#restroomStripe)" stroke="#0f172a" stroke-width="2.5" />
+                <line x1="261" y1="376" x2="261" y2="496" stroke="#0284c7" stroke-width="3" />
+                <text x="261" y="439" font-size="15" font-weight="900" fill="#0f172a" text-anchor="middle">廁所</text>
+                <circle cx="232" cy="459" r="3.5" fill="#2563eb" />
+                <rect x="228" y="464" width="8" height="13" rx="2" fill="#2563eb" />
+                <circle cx="290" cy="459" r="3.5" fill="#7c3aed" />
+                <polygon points="285,477 295,477 292,464 288,464" fill="#7c3aed" />
+              </g>
+
+              <!-- 下方四間教室 -->
+              <g stroke="#0f172a" stroke-width="2.5" fill="#ffffff">
+                <rect x="318" y="376" width="88" height="120" />
+                <line x1="318" y1="376" x2="406" y2="496" stroke-width="1.5" /><line x1="406" y1="376" x2="318" y2="496" stroke-width="1.5" />
+
+                <rect x="406" y="376" width="88" height="120" />
+                <line x1="406" y1="376" x2="494" y2="496" stroke-width="1.5" /><line x1="494" y1="376" x2="406" y2="496" stroke-width="1.5" />
+
+                <rect x="494" y="376" width="88" height="120" />
+                <line x1="494" y1="376" x2="582" y2="496" stroke-width="1.5" /><line x1="582" y1="376" x2="494" y2="496" stroke-width="1.5" />
+
+                <rect x="582" y="376" width="88" height="120" />
+                <line x1="582" y1="376" x2="670" y2="496" stroke-width="1.5" /><line x1="670" y1="376" x2="582" y2="496" stroke-width="1.5" />
+              </g>
+              <g font-size="15" font-weight="800" fill="#0f172a" text-anchor="middle">
+                <text x="362" y="441">教室</text>
+                <text x="450" y="441">教室</text>
+                <text x="538" y="441">教室</text>
+                <text x="626" y="441">教室</text>
+              </g>
+
+              <!-- 右側廁所 -->
+              <g class="equip-restroom cursor-pointer" onclick="selectEquipment('HYD-4F-03')">
+                <rect x="670" y="376" width="114" height="120" fill="url(#restroomStripe)" stroke="#0f172a" stroke-width="2.5" />
+                <line x1="727" y1="376" x2="727" y2="496" stroke="#0284c7" stroke-width="3" />
+                <text x="727" y="439" font-size="15" font-weight="900" fill="#0f172a" text-anchor="middle">廁所</text>
+                <circle cx="698" cy="459" r="3.5" fill="#2563eb" />
+                <rect x="694" y="464" width="8" height="13" rx="2" fill="#2563eb" />
+                <circle cx="756" cy="459" r="3.5" fill="#7c3aed" />
+                <polygon points="751,477 761,477 758,464 754,464" fill="#7c3aed" />
+              </g>
+
+              <!-- 右側逃生樓梯 -->
+              <g class="equip-stair cursor-pointer" onclick="selectEquipment('STAIR-RIGHT')">
+                <rect x="784" y="376" width="68" height="120" fill="#ffffff" stroke="#0f172a" stroke-width="2.5" />
+                <line x1="818" y1="376" x2="818" y2="496" stroke="#0f172a" stroke-width="2" />
+                <g stroke="#334155" stroke-width="1.2">
+                  <line x1="784" y1="393" x2="818" y2="393" /><line x1="784" y1="409" x2="818" y2="409" />
+                  <line x1="784" y1="425" x2="818" y2="425" /><line x1="784" y1="441" x2="818" y2="441" />
+                  <line x1="784" y1="457" x2="818" y2="457" /><line x1="784" y1="473" x2="818" y2="473" />
+                  <line x1="818" y1="393" x2="852" y2="393" /><line x1="818" y1="409" x2="852" y2="409" />
+                  <line x1="818" y1="425" x2="852" y2="425" /><line x1="818" y1="441" x2="852" y2="441" />
+                  <line x1="818" y1="457" x2="852" y2="457" /><line x1="818" y1="473" x2="852" y2="473" />
+                </g>
+              </g>
+              <text x="818" y="516" font-size="14" font-weight="900" fill="#14532d" text-anchor="middle">3F</text>
+              <text x="818" y="532" font-size="12" font-weight="800" fill="#14532d" text-anchor="middle">(樓梯往下)</text>
+
+              <!-- 消防栓標示（共 3 個：左廁所上方、中央主樓梯正下方、右廁所上方） -->
+              <g class="equip-hyd cursor-pointer" onclick="selectEquipment('HYD-4F-01')">
+                <rect x="231" y="382" width="60" height="22" rx="4" fill="#ffffff" stroke="#dc2626" stroke-width="2" />
+                <text x="261" y="397" font-size="12" font-weight="900" fill="#dc2626" text-anchor="middle">消防栓</text>
+              </g>
+              <g class="equip-hyd cursor-pointer" onclick="selectEquipment('HYD-4F-02')">
+                <rect x="424" y="292" width="52" height="20" rx="4" fill="#ffffff" stroke="#dc2626" stroke-width="2" />
+                <text x="450" y="306" font-size="11.5" font-weight="900" fill="#dc2626" text-anchor="middle">消防栓</text>
+              </g>
+              <g class="equip-hyd cursor-pointer" onclick="selectEquipment('HYD-4F-03')">
+                <rect x="697" y="382" width="60" height="22" rx="4" fill="#ffffff" stroke="#dc2626" stroke-width="2" />
+                <text x="727" y="397" font-size="12" font-weight="900" fill="#dc2626" text-anchor="middle">消防栓</text>
+              </g>
+
+              <!-- 飲水機（2 台） -->
+              <g class="equip-wat cursor-pointer" onclick="selectEquipment('WAT-4F-01')">
+                <rect x="194" y="278" width="18" height="18" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="1.5" />
+              </g>
+              <g class="equip-wat cursor-pointer" onclick="selectEquipment('WAT-4F-02')">
+                <rect x="746" y="278" width="18" height="18" rx="2" fill="#f59e0b" stroke="#0f172a" stroke-width="1.5" />
+              </g>
+
+              <!-- 逃生梯藍色標記（4 座，精準對齊上方外牆） -->
+              <g class="equip-esc cursor-pointer" onclick="selectEquipment('ESC-4F-01')">
+                <circle cx="176" cy="20" r="7" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
+              </g>
+              <g class="equip-esc cursor-pointer" onclick="selectEquipment('ESC-4F-02')">
+                <circle cx="326" cy="20" r="7" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
+              </g>
+              <g class="equip-esc cursor-pointer" onclick="selectEquipment('ESC-4F-03')">
+                <circle cx="554" cy="20" r="7" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
+              </g>
+              <g class="equip-esc cursor-pointer" onclick="selectEquipment('ESC-4F-04')">
+                <circle cx="776" cy="20" r="7" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
+              </g>
+
+              <!-- SOS 緊急電話（2 台，精準對齊左右走廊） -->
+              <g class="equip-sos cursor-pointer" onclick="selectEquipment('SOS-4F-01')">
+                <rect x="144" y="288" width="36" height="22" rx="3" fill="#ffffff" stroke="#dc2626" stroke-width="1.8" />
+                <text x="162" y="303" font-size="11" font-weight="900" fill="#dc2626" text-anchor="middle">SOS</text>
+                <circle cx="162" cy="324" r="10" fill="#dc2626" />
+                <path d="M 158 321 L 161 324 L 166 320" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
+              </g>
+              <g class="equip-sos cursor-pointer" onclick="selectEquipment('SOS-4F-02')">
+                <rect x="756" y="288" width="36" height="22" rx="3" fill="#ffffff" stroke="#dc2626" stroke-width="1.8" />
+                <text x="774" y="303" font-size="11" font-weight="900" fill="#dc2626" text-anchor="middle">SOS</text>
+                <circle cx="774" cy="324" r="10" fill="#dc2626" />
+                <path d="M 770 321 L 773 324 L 778 320" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
+              </g>
+
+              <!-- 滅火器紅點（全樓層共 16 支，含左右樓梯轉彎處各 1 支） -->
+              <g class="equip-ext">
+                <circle cx="150" cy="29" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-01')" />
+                <circle cx="166" cy="29" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-02')" />
+
+                <circle cx="144" cy="258" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-03')" />
+                <circle cx="144" cy="274" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-04')" />
+
+                <circle cx="268" cy="284" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-05')" />
+                <circle cx="284" cy="284" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-06')" />
+
+                <circle cx="442" cy="365" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-07')" />
+                <circle cx="458" cy="365" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-08')" />
+
+                <circle cx="602" cy="284" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-09')" />
+                <circle cx="618" cy="284" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-10')" />
+
+                <circle cx="728" cy="29" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-11')" />
+                <circle cx="744" cy="29" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-12')" />
+                <circle cx="760" cy="29" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-13')" />
+
+                <circle cx="788" cy="264" r="6" fill="#dc2626" class="cursor-pointer" onclick="selectEquipment('EXT-4F-14')" />
+
+                <!-- 左右兩側逃生樓梯轉彎處滅火器（#15 與 #16） -->
+                <circle cx="194" cy="365" r="6.5" fill="#dc2626" stroke="#ffffff" stroke-width="1.5" class="cursor-pointer" onclick="selectEquipment('EXT-4F-15')" />
+                <circle cx="792" cy="365" r="6.5" fill="#dc2626" stroke="#ffffff" stroke-width="1.5" class="cursor-pointer" onclick="selectEquipment('EXT-4F-16')" />
+              </g>
+
+              <!-- 綠色逃生動線箭頭 -->
+              <g class="equip-route" stroke="#16a34a" stroke-width="3.5" fill="none">
+                <!-- 中央主樓梯往上 3F 箭頭 -->
+                <path d="M 382 270 C 382 217, 425 192, 480 200" marker-end="url(#greenArrow)" />
+                <!-- 走廊水平主幹道 -->
+                <line x1="420" y1="342" x2="206" y2="342" class="escape-route-animated" marker-end="url(#greenArrow)" />
+                <line x1="420" y1="342" x2="758" y2="342" class="escape-route-animated" marker-end="url(#greenArrow)" />
+                <!-- 往中央主樓梯方向箭頭 -->
+                <line x1="420" y1="342" x2="420" y2="315" class="escape-route-animated" marker-end="url(#greenArrow)" />
+                <!-- 左右兩側往下 3F 逃生梯箭頭 -->
+                <line x1="206" y1="342" x2="206" y2="371" class="escape-route-animated" marker-end="url(#greenArrow)" />
+                <line x1="758" y1="342" x2="758" y2="371" class="escape-route-animated" marker-end="url(#greenArrow)" />
+              </g>
+
+              <!-- 右下角座標 -->
+              <text x="876" y="552" font-size="14" font-weight="700" fill="#0f172a" text-anchor="end">23°57'06.0"N 120°55'47.9"E</text>
+            </svg>
+          </div>
+
+          <!-- 點擊設備後顯示的檢視卡片 -->
+          <div id="equipmentDetailCard" class="hidden bg-slate-900 text-white rounded-2xl p-4 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span id="detailBadge" class="text-xs font-mono font-black bg-red-600 text-white px-2.5 py-0.5 rounded-full">EXT-4F-01</span>
+                <h4 id="detailName" class="text-sm sm:text-base font-black text-amber-300">設備名稱</h4>
+              </div>
+              <p id="detailLocation" class="text-xs text-slate-300">位置：教育學院 A棟 4F</p>
+              <p id="detailExpiry" class="text-xs text-slate-300">檢修有效期限：115-08-29</p>
+            </div>
+            <div class="flex items-center gap-2 self-end sm:self-center">
+              <button type="button" onclick="reportSelectedEquipment()" class="bg-orange-600 hover:bg-orange-500 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow cursor-pointer whitespace-nowrap">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>通報此設備異常
+              </button>
+              <button type="button" onclick="closeEquipmentDetail()" class="bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer">
+                關閉
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- 分頁四：災前整備與減災防災測驗（7題全校通用減災整備互動測驗）             -->
+      <!-- =================================================================== -->
+      <section id="view-game" class="tab-view hidden space-y-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200">
+
+          <!-- 頂部標題與目前得分 -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+            <div>
+              <span class="text-[11px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full">災前整備與減災互動測驗</span>
+              <h3 class="text-base sm:text-lg font-black text-ncnuBlue mt-1">地震與用電防火・災前減災整備測驗</h3>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+              <span class="text-xs font-bold text-slate-500">答對題數：</span>
+              <span id="gameScoreDisplay" class="text-base font-black text-blue-700">0 / 7 題</span>
+            </div>
+          </div>
+
+          <!-- 測驗作答區（頂部分段進度條 + 題幹 + 選項卡 + 折疊提示） -->
+          <div id="quiz-active-container" class="space-y-5">
+            <!-- 仿參考圖頂部分段橫向進度條與題號計數 (1 / 7) -->
+            <div class="flex items-center gap-3">
+              <div id="quizSegmentedBar" class="flex-1 grid grid-cols-7 gap-1.5">
+                <!-- 由 JS 動態渲染 7 段進度條與 ✓ / ✕ 標記 -->
+              </div>
+              <span id="quizCounterText" class="text-xs sm:text-sm font-mono font-black text-slate-700 whitespace-nowrap">1 / 7</span>
+            </div>
+
+            <!-- 題目文字 -->
+            <div class="pt-1">
+              <h4 id="quizQuestionText" class="text-base sm:text-xl font-black text-slate-900 leading-relaxed"></h4>
+            </div>
+
+            <!-- 四個選項卡片（點擊後於選項框內直接顯示 Correct! 與解析） -->
+            <div id="quizOptionsContainer" class="space-y-3"></div>
+
+            <!-- 底部操作列：左側「顯示提示 ⌄」折疊按鈕 + 右側「下一題 ➔」按鈕 -->
+            <div class="pt-2 flex flex-wrap items-start justify-between gap-3">
+              <div class="flex-1 min-w-[220px]">
+                <button type="button" onclick="toggleQuizHint()" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-600 hover:text-slate-900 py-1.5 px-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+                  <span>顯示提示</span>
+                  <i id="quizHintChevron" class="fa-solid fa-chevron-down text-xs transition-transform"></i>
+                </button>
+                <div id="quizHintBox" class="hidden mt-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs sm:text-sm text-amber-950 leading-relaxed">
+                  <span class="font-black text-amber-800"><i class="fa-regular fa-lightbulb mr-1"></i>減災小提示：</span>
+                  <span id="quizHintText"></span>
+                </div>
+              </div>
+
+              <button id="nextQuestionBtn" type="button" onclick="goToNextQuestion()" class="hidden bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs sm:text-sm font-black px-5 py-2.5 rounded-xl shadow-md items-center gap-1.5 transition cursor-pointer shrink-0">
+                <span id="nextQuestionBtnLabel">下一題</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 測驗完成總結畫面 -->
+          <div id="quiz-complete-container" class="hidden py-4 space-y-5">
+            <div class="text-center space-y-3 bg-gradient-to-b from-blue-50 to-white p-5 rounded-2xl border border-blue-100">
+              <div class="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl mx-auto shadow-md">
+                <i class="fa-solid fa-award"></i>
+              </div>
+              <div>
+                <span class="text-xs font-black bg-blue-100 text-blue-800 px-3 py-1 rounded-full">災前整備測驗完成</span>
+                <h4 id="quizFinalTitle" class="text-lg sm:text-xl font-black text-ncnuBlue mt-2">恭喜完成暨大校園防災減災整備測驗！</h4>
+                <p id="finalScoreSummary" class="text-sm sm:text-base font-bold text-slate-700 mt-1">總成績：7 / 7 題（100 分）</p>
+              </div>
+            </div>
+
+            <!-- 錯題回顧區（若有答錯題目時自動列出複習） -->
+            <div id="quizMistakeReviewSection" class="hidden space-y-2.5">
+              <h5 class="text-xs sm:text-sm font-black text-rose-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-book-open"></i>
+                <span>重點觀念複習（本測驗答錯題目解析）</span>
+              </h5>
+              <div id="quizMistakeList" class="space-y-2.5"></div>
+            </div>
+
+            <div class="text-center pt-1">
+              <button onclick="resetQuiz()" class="bg-ncnuBlue hover:bg-slate-800 active:scale-95 text-white font-black px-6 py-2.5 rounded-xl shadow cursor-pointer inline-flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>重新測驗</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- 分頁二：設備異常通報 & 災時受困位置人數回報                            -->
+      <!-- =================================================================== -->
+      <section id="view-report" class="tab-view hidden space-y-4">
+        <!-- 分段切換開關 -->
+        <div class="bg-slate-200 p-1.5 rounded-2xl grid grid-cols-2 gap-1.5">
+          <button onclick="switchReportSubTab('equipment')" id="subtab-equipment" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition bg-white text-ncnuBlue shadow cursor-pointer">
+            <i class="fa-solid fa-screwdriver-wrench text-orange-600 mr-1.5"></i>模式 A：設備異常通報
+          </button>
+          <button onclick="switchReportSubTab('trapped')" id="subtab-trapped" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition text-slate-600 hover:text-slate-900 cursor-pointer">
+            <i class="fa-solid fa-life-ring text-red-600 mr-1.5"></i>模式 B：災時受困人數回報
+          </button>
+        </div>
+
+        <!-- 模式 A：設備異常通報表單 -->
+        <div id="report-panel-equipment" class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h3 class="text-base sm:text-lg font-black text-ncnuBlue flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-clipboard-list"></i>
+              </span>
+              消防及防災設備異常通報表單
+            </h3>
+            <p class="text-xs text-slate-500 mt-1">請選擇異常的具體設備編號與故障狀況，送出後將自動派單通知總務處營繕組與校安中心。</p>
+          </div>
+
+          <form id="equipmentReportForm" onsubmit="submitEquipmentReport(event)" class="space-y-4">
+            <!-- 1. 所在建築樓層 & 具體設備下拉選單 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">所在位置（預設鎖定） <span class="text-red-500">*</span></label>
+                <input type="text" id="repBuildingFloor" value="教育學院 A棟 4樓" readonly class="w-full bg-orange-50 border border-orange-300 text-orange-950 font-black text-sm rounded-xl px-3 py-2.5 focus:outline-none" />
+              </div>
+              <div>
+                <label for="repEquipmentSelect" class="block text-xs font-bold text-slate-700 mb-1">異常設備與位置選擇 <span class="text-red-500">*</span></label>
+                <select id="repEquipmentSelect" required class="w-full bg-slate-50 border border-slate-300 text-slate-800 font-bold text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:outline-none">
+                  <optgroup label="── 滅火器 (全樓層共 16 支) ──">
+                    <option value="EXT-4F-15">左側逃生樓梯轉彎處滅火器 (EXT-4F-15)</option>
+                    <option value="EXT-4F-16">右側逃生樓梯轉彎處滅火器 (EXT-4F-16)</option>
+                    <option value="EXT-4F-01">上方左側走廊滅火器 #1 (EXT-4F-01)</option>
+                    <option value="EXT-4F-02">上方左側走廊滅火器 #2 (EXT-4F-02)</option>
+                    <option value="EXT-4F-03">左側走廊 SOS 上方滅火器 #1 (EXT-4F-03)</option>
+                    <option value="EXT-4F-04">左側走廊 SOS 上方滅火器 #2 (EXT-4F-04)</option>
+                    <option value="EXT-4F-05">中左教室下方走廊滅火器 #1 (EXT-4F-05)</option>
+                    <option value="EXT-4F-06">中左教室下方走廊滅火器 #2 (EXT-4F-06)</option>
+                    <option value="EXT-4F-07">下方中央教室走廊滅火器 #1 (EXT-4F-07)</option>
+                    <option value="EXT-4F-08">下方中央教室走廊滅火器 #2 (EXT-4F-08)</option>
+                    <option value="EXT-4F-09">中右教室下方走廊滅火器 #1 (EXT-4F-09)</option>
+                    <option value="EXT-4F-10">中右教室下方走廊滅火器 #2 (EXT-4F-10)</option>
+                    <option value="EXT-4F-11">上方右側走廊滅火器 #1 (EXT-4F-11)</option>
+                    <option value="EXT-4F-12">上方右側走廊滅火器 #2 (EXT-4F-12)</option>
+                    <option value="EXT-4F-13">上方右側走廊滅火器 #3 (EXT-4F-13)</option>
+                    <option value="EXT-4F-14">右側走廊 SOS 上方滅火器 (EXT-4F-14)</option>
+                  </optgroup>
+                  <optgroup label="── 室內消防栓 (全樓層共 3 個) ──">
+                    <option value="HYD-4F-02">中央主樓梯前消防栓 (HYD-4F-02)</option>
+                    <option value="HYD-4F-01">左側廁所前消防栓 (HYD-4F-01)</option>
+                    <option value="HYD-4F-03">右側廁所前消防栓 (HYD-4F-03)</option>
+                  </optgroup>
+                  <optgroup label="── 緊急通訊與逃生標示設備 ──">
+                    <option value="SOS-4F-01">左側走廊 SOS 緊急電話 (SOS-4F-01)</option>
+                    <option value="SOS-4F-02">右側走廊 SOS 緊急電話 (SOS-4F-02)</option>
+                    <option value="EXIT-4F-LEFT">左側逃生出口方向指示燈</option>
+                    <option value="EXIT-4F-RIGHT">右側逃生出口方向指示燈</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+
+            <!-- 2. 快速異常問題勾選 -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-2">異常狀況快速勾選（可複選）</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="issueTag" value="壓力錶指針不在綠色區域" class="peer sr-only" />
+                  <div class="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                    <i class="fa-solid fa-gauge-simple-high mr-1.5"></i>壓力錶指針不在綠色區域
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="issueTag" value="瓶身生鏽/外觀受損" class="peer sr-only" />
+                  <div class="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                    <i class="fa-solid fa-burst mr-1.5"></i>瓶身生鏽 / 外觀受損
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="issueTag" value="插銷/封條脫落" class="peer sr-only" />
+                  <div class="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                    <i class="fa-solid fa-link-slash mr-1.5"></i>插銷 / 封條脫落
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="issueTag" value="超過有效期限" class="peer sr-only" />
+                  <div class="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                    <i class="fa-regular fa-calendar-xmark mr-1.5"></i>超過有效期限
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="issueTag" value="消防栓箱門無法開啟/漏水" class="peer sr-only" />
+                  <div class="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                    <i class="fa-solid fa-faucet-drip mr-1.5"></i>消防栓箱門無法開啟 / 漏水
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="checkbox" name="issueTag" value="通道遭雜物阻擋" class="peer sr-only" />
+                  <div class="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 bg-slate-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                    <i class="fa-solid fa-boxes-stacked mr-1.5"></i>通道遭雜物阻擋
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 3. 補充說明與照片上傳預覽 -->
+            <div>
+              <label for="repDetailText" class="block text-xs font-bold text-slate-700 mb-1">詳細故障說明</label>
+              <textarea id="repDetailText" rows="2" placeholder="請描述現場觀察到的異常細節（例如：左側樓梯轉彎處滅火器壓力針偏低）..." class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-3 rounded-xl border border-dashed border-slate-300">
+              <div class="flex items-center gap-2.5">
+                <label class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl shadow-2xs cursor-pointer flex items-center gap-1.5">
+                  <i class="fa-solid fa-camera text-orange-600"></i>
+                  <span>上傳現場照片</span>
+                  <input type="file" accept="image/*" onchange="handlePhotoPreview(event)" class="hidden" />
+                </label>
+                <span id="photoFileName" class="text-xs text-slate-500">尚未選擇照片（選填）</span>
+              </div>
+              <div id="photoPreviewBox" class="hidden w-14 h-14 rounded-lg overflow-hidden border border-slate-300">
+                <img id="photoPreviewImg" src="" alt="照片預覽" class="w-full h-full object-cover" />
+              </div>
+            </div>
+
+            <button type="submit" class="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 active:scale-99 text-white font-black py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 text-base transition cursor-pointer">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>送出設備異常通報</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- 模式 B：災時受困位置及人數回報 -->
+        <div id="report-panel-trapped" class="hidden bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-red-400 space-y-4">
+          <!-- 醒目觀念提醒橫幅 -->
+          <div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-3.5 flex items-start gap-3">
+            <i class="fa-solid fa-bullhorn text-amber-600 text-xl mt-0.5 shrink-0"></i>
+            <div class="text-xs sm:text-sm text-amber-950 space-y-1">
+              <p class="font-black text-red-700">⚠️ 能逃生請先往戶外空曠處疏散，到達戶外再報案；僅限「受困無法逃生」時填寫此表單！</p>
+              <p class="text-slate-700 leading-relaxed">
+                <strong>原則一（可逃生時）：</strong>發生火災或地震時，請優先往<strong>戶外空曠處（如學院前廣場、大草坪）</strong>疏散，抵達戶外安全地點後再撥打 <strong>119</strong> 或 <strong>校安中心專線 (049-2910960)</strong> 通報。<br/>
+                <strong>原則二（受困無法逃生時）：</strong>本表單專供<strong>逃生路線受阻、濃煙密布或建物受損導致無法逃生而受困於室內</strong>時使用，以便校務防災中心與消防隊精準掌握受困樓層、區域與人數。
+              </p>
+            </div>
+          </div>
+
+          <form onsubmit="submitTrappedReport(event)" class="space-y-4">
+            <!-- 受困區域快速選擇 -->
+            <div>
+              <label for="trapRoom" class="block text-xs font-bold text-slate-700 mb-1">目前受困區域（僅限無法逃生受困室內時填寫） <span class="text-red-500">*</span></label>
+              <select id="trapRoom" class="w-full bg-red-50/40 border border-red-300 text-slate-900 font-bold text-sm rounded-xl px-3 py-2.5 focus:outline-none">
+                <option value="教育學院 A棟 4F - 休息區">休息區（中央主樓梯附近）</option>
+                <option value="教育學院 A棟 4F - 左側教室區">左側教室區</option>
+                <option value="教育學院 A棟 4F - 右側教室區">右側教室區</option>
+                <option value="教育學院 A棟 4F - 下方四間教室區">下方四間教室區</option>
+                <option value="教育學院 A棟 4F - 有對外窗教室（關門待援中）">有對外窗教室（關門塞門縫待援中）</option>
+              </select>
+            </div>
+
+            <!-- 受困人數步進器 (1人 ~ 20+人) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">受困總人數（1人 ~ 20+人） <span class="text-red-500">*</span></label>
+              <div class="flex items-center gap-3">
+                <button type="button" onclick="adjustTrappedCount(-1)" class="w-11 h-11 rounded-xl bg-slate-200 hover:bg-slate-300 font-black text-lg cursor-pointer">-</button>
+                <div class="px-4 py-2 border-2 border-red-300 rounded-xl bg-white min-w-[105px] text-center">
+                  <span id="trappedCountDisplay" class="font-black text-xl text-red-700">1 人</span>
+                </div>
+                <button type="button" onclick="adjustTrappedCount(1)" class="w-11 h-11 rounded-xl bg-slate-200 hover:bg-slate-300 font-black text-lg cursor-pointer">+</button>
+                <span class="text-xs text-slate-500">含通報者本人</span>
+              </div>
+            </div>
+
+            <!-- 現場狀況選擇 -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">現場受困狀況（可複選）</label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                  <input type="checkbox" name="trapStatus" value="濃煙阻斷逃生動線" checked class="accent-red-600 w-4 h-4" />
+                  <span class="font-bold">濃煙阻斷逃生動線</span>
+                </label>
+                <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                  <input type="checkbox" name="trapStatus" value="建物受損/門變形受困" class="accent-red-600 w-4 h-4" />
+                  <span class="font-bold">建物受損/門變形受困</span>
+                </label>
+                <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                  <input type="checkbox" name="trapStatus" value="人員受傷/行動不便" class="accent-red-600 w-4 h-4" />
+                  <span class="font-bold">人員受傷/行動不便</span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 active:scale-99 text-white font-black py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base transition cursor-pointer">
+              <i class="fa-solid fa-tower-broadcast animate-pulse"></i>
+              <span>無法逃生受困求救：發送位置與人數至防災中心</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- 本樓層通報紀錄列表（儲存於 localStorage） -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-black text-slate-800 flex items-center gap-1.5">
+              <i class="fa-solid fa-clock-rotate-left text-ncnuBlue"></i>
+              <span>本樓層通報紀錄</span>
+            </h4>
+            <span id="reportCountBadge" class="text-xs bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full">共 2 筆</span>
+          </div>
+          <div id="reportHistoryList" class="space-y-2.5"></div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- 分頁三：全校通用防災宣導（簡化兩大主分類：一般火災 / 地震防災）          -->
+      <!-- =================================================================== -->
+      <section id="view-guide" class="tab-view hidden space-y-4">
+
+        <!-- 頂部簡化兩大主選單切換按鈕 -->
+        <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-bold text-slate-500">
+              <i class="fa-solid fa-school text-ncnuBlue mr-1"></i>全校通用防災指引（適用暨大各教學大樓、研究室與宿舍）
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button onclick="switchGuideCategory('fire')" id="guide-cat-fire" class="py-3.5 px-4 rounded-xl text-sm sm:text-base font-black transition flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-md cursor-pointer">
+              <span class="text-lg">🔥</span>
+              <span>一般火災宣導</span>
+            </button>
+            <button onclick="switchGuideCategory('earthquake')" id="guide-cat-earthquake" class="py-3.5 px-4 rounded-xl text-sm sm:text-base font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">
+              <span class="text-lg">🫨</span>
+              <span>地震防災宣導</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ==================== 主分類一：一般火災宣導（全校通用） ==================== -->
+        <div id="guide-panel-fire" class="space-y-4">
+          <!-- 子階段切換：災前預防 vs 災中應變與逃生 -->
+          <div class="bg-orange-100/80 p-1.5 rounded-2xl grid grid-cols-2 gap-1.5 border border-orange-200">
+            <button onclick="switchGuideSubStage('fire', 'pre')" id="fire-sub-pre" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition bg-white text-orange-700 shadow cursor-pointer">
+              <i class="fa-solid fa-eye mr-1.5"></i>災前預防（日常觀察與習慣）
+            </button>
+            <button onclick="switchGuideSubStage('fire', 'during')" id="fire-sub-during" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition text-orange-900/70 hover:text-orange-950 cursor-pointer">
+              <i class="fa-solid fa-person-running mr-1.5"></i>災中應變與逃生（全校通用）
+            </button>
+          </div>
+
+          <!-- 火災細項 1：災前預防（一般人日常即可觀察的徵兆與習慣） -->
+          <div id="fire-detail-pre" class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-3">
+            <div class="border-b border-slate-100 pb-2.5">
+              <h3 class="text-base sm:text-lg font-black text-orange-700 flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                火災災前預防：日常一眼就能觀察的徵兆與習慣
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">無須專業儀器，全校師生在教室、研究室與宿舍每天都能隨手觀察與預防：</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+              <div class="p-3.5 rounded-xl bg-orange-50/70 border border-orange-200 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0 mt-0.5 font-black">1</div>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">延長線與插座日常觀察</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    留意電線外皮是否<strong>發燙、焦黑變色、硬化破損</strong>或插頭鬆動積灰塵；避免吹風機、電熱水壺、微波爐等高功率電器共用同一條延長線，電線切勿綑綁或壓在重物下。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 mt-0.5 font-black">2</div>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">走廊、樓梯間與防火門日常暢通</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    觀察平時行走的走廊、安全梯間與出口門前是否<strong>堆放紙箱、雜物或停放腳踏車</strong>；各棟大樓的<strong>常閉式防火門</strong>平時應保持關閉且不上鎖，切勿用門檔或滅火器頂住門扇。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 mt-0.5 font-black">3</div>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">教室、研究室與宿舍用火用電習慣</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    離開座位或就寢前關閉電熱器、電磁爐與不必要電源，避免行動電源或筆電在無人看管時長時間過度充電；若聞到<strong>塑膠焦味或發現異常跳電</strong>，應立即拔除插頭並通知管理人員。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 火災細項 2：災中應變與逃生（全校通用觀念，先逃戶外再通報） -->
+          <div id="fire-detail-during" class="hidden bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-3">
+            <div class="border-b border-slate-100 pb-2.5">
+              <h3 class="text-base sm:text-lg font-black text-red-700 flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm">
+                  <i class="fa-solid fa-fire"></i>
+                </span>
+                火災災中應變與逃生：全校通用保命原則
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">火場濃煙每秒可上升 3～5 公尺，把握「先往戶外安全處逃生、抵達戶外再通報」：</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+              <div class="p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">📢</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-red-900">1. 大喊示警 ➔ 逃往戶外空曠處 ➔ 抵達戶外再通報</h4>
+                  <p class="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                    發現火煙立刻大喊<strong>「失火了！」</strong>並按下走廊手動報警機。<strong>首要原則是立即往戶外空曠處（如大草坪、學院前廣場）疏散，抵達戶外安全地點後再撥打 119 與校安中心 (049-2910960) 通報</strong>，切勿留在火場內打電話延誤逃生。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">🚫</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">2. 小火才滅火、濃煙快逃生，嚴禁搭乘電梯</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    火勢若已超過一人高或濃煙開始蔓延，請放棄滅火立即逃生；全校各棟建築<strong>火警時嚴禁搭乘電梯</strong>，務必改走安全逃生樓梯。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">🏃</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-emerald-900">3. 採低姿勢沿牆壁向下逃生，隨手關門</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    濃煙會往上方聚集，逃生時請壓低身體（離地約 30 公分以下）沿牆壁尋找出口標示往下樓層疏散，離開房間時<strong>隨手關門</strong>（不上鎖）以阻隔火煙擴散。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">🚪</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-amber-950">4. 樓梯間濃煙密布無法逃生時：關門塞縫、開窗求救並填寫「受困通報」</h4>
+                  <p class="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                    若開門發現走廊或樓梯間充滿濃煙<strong>無法向下逃生</strong>，請退回有對外窗的教室，立即關門並用衣物塞住門縫阻隔濃煙，開啟對外窗揮舞衣物求救，此時再開啟本系統<strong>「受困回報位置及人數」</strong>傳送受困位置給校務防災中心。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 次要精簡附錄區塊：滅火器操作四步驟（可展開/收合，視覺縮小） -->
+          <details class="bg-slate-100 rounded-xl border border-slate-300 overflow-hidden group">
+            <summary class="px-4 py-2.5 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/70 transition">
+              <div class="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700">
+                <i class="fa-solid fa-fire-extinguisher text-slate-500"></i>
+                <span>附錄參考：初期小火滅火器操作四步驟（拉、瞄、壓、掃）</span>
+              </div>
+              <span class="text-xs text-slate-500 font-bold group-open:rotate-180 transition-transform">
+                <i class="fa-solid fa-chevron-down"></i>
+              </span>
+            </summary>
+            <div class="p-3 bg-white border-t border-slate-200 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <p class="text-[11px] text-slate-500">僅限火源尚小且背後逃生路線暢通時使用：</p>
+                <button id="voiceGuideBtn" onclick="speakExtinguisherSteps()" class="bg-slate-700 hover:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer">
+                  <span>🔊</span>
+                  <span id="voiceGuideText">語音口訣</span>
+                </button>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div id="step-card-1" class="step-card rounded-lg bg-slate-50 border border-slate-200 p-2">
+                  <p class="font-black text-xs text-red-700">1. 拉（拔插銷）</p>
+                  <p class="text-[11px] text-slate-600 mt-0.5">拉開安全插銷</p>
+                </div>
+                <div id="step-card-2" class="step-card rounded-lg bg-slate-50 border border-slate-200 p-2">
+                  <p class="font-black text-xs text-orange-700">2. 瞄（瞄準底部）</p>
+                  <p class="text-[11px] text-slate-600 mt-0.5">噴嘴瞄準火源底部</p>
+                </div>
+                <div id="step-card-3" class="step-card rounded-lg bg-slate-50 border border-slate-200 p-2">
+                  <p class="font-black text-xs text-amber-700">3. 壓（壓把手）</p>
+                  <p class="text-[11px] text-slate-600 mt-0.5">用力壓下手壓柄</p>
+                </div>
+                <div id="step-card-4" class="step-card rounded-lg bg-slate-50 border border-slate-200 p-2">
+                  <p class="font-black text-xs text-emerald-700">4. 掃（左右掃射）</p>
+                  <p class="text-[11px] text-slate-600 mt-0.5">由近而遠左右掃射</p>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- ==================== 主分類二：地震防災宣導（全校通用） ==================== -->
+        <div id="guide-panel-earthquake" class="hidden space-y-4">
+          <!-- 子階段切換：災前預防 vs 災中應變與逃生 -->
+          <div class="bg-sky-100/80 p-1.5 rounded-2xl grid grid-cols-2 gap-1.5 border border-sky-200">
+            <button onclick="switchGuideSubStage('eq', 'pre')" id="eq-sub-pre" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition bg-white text-sky-800 shadow cursor-pointer">
+              <i class="fa-solid fa-eye mr-1.5"></i>災前預防（日常環境觀察）
+            </button>
+            <button onclick="switchGuideSubStage('eq', 'during')" id="eq-sub-during" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition text-sky-900/70 hover:text-sky-950 cursor-pointer">
+              <i class="fa-solid fa-house-crack mr-1.5"></i>災中應變與逃生（全校通用）
+            </button>
+          </div>
+
+          <!-- 地震細項 1：災前預防（日常環境與物品固定觀察） -->
+          <div id="eq-detail-pre" class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-3">
+            <div class="border-b border-slate-100 pb-2.5">
+              <h3 class="text-base sm:text-lg font-black text-sky-800 flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-sm">
+                  <i class="fa-solid fa-clipboard-check"></i>
+                </span>
+                地震災前預防：日常環境與物品掉落風險觀察
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">平時在教室、辦公室、實驗室或宿舍裡，一般人抬頭與環顧四周就能發現的防震重點：</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+              <div class="p-3.5 rounded-xl bg-sky-50/80 border border-sky-200 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-sky-700 text-white flex items-center justify-center shrink-0 mt-0.5 font-black">1</div>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">高處重物、書櫃與天花板燈具觀察</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    抬頭觀察書櫃、檔案櫃頂端是否<strong>堆放厚重書籍、紙箱或花盆</strong>，玻璃櫃門扣鎖是否牢固，以及天花板吊扇、投影機與燈具是否有晃動或鬆脫異常，重物應改放至櫃子最下層。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 font-black">2</div>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">座位與床鋪上方安全環境確認</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    檢視平時上課座位、研究室辦公桌或宿舍床鋪上方，是否緊鄰<strong>大片玻璃窗或未固定的高櫃</strong>；書桌下保持淨空，確保強震發生時有足夠空間可供躲避掩護。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-teal-50/70 border border-teal-200 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 mt-0.5 font-black">3</div>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">熟悉建築物出口與戶外空曠集合點</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    平時進入任何教學大樓時，先留意<strong>最近的兩座逃生樓梯方向</strong>及戶外空曠疏散集合點（如大草坪、廣場），並隨身或於床頭備妥手電筒、哨子與飲用水。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 地震細項 2：災中應變與逃生（趴下掩護穩住 -> 停後往戶外疏散 -> 戶外集合清點/通報） -->
+          <div id="eq-detail-during" class="hidden bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 space-y-3">
+            <div class="border-b border-slate-100 pb-2.5">
+              <h3 class="text-base sm:text-lg font-black text-indigo-800 flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm">
+                  <i class="fa-solid fa-shield-cat"></i>
+                </span>
+                地震災中應變與逃生：全校通用三階段行動
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">地震當下切勿驚慌奪門而出，請依「先保命、搖晃停止後往戶外疏散、抵達戶外再清點通報」執行：</p>
+            </div>
+
+            <!-- 抗震保命三步驟圖卡 -->
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-sky-50 border-2 border-sky-300 rounded-xl p-3">
+                <span class="text-2xl block mb-1">🧎</span>
+                <p class="font-black text-sm text-sky-950">1. 趴下</p>
+                <p class="text-[11px] text-sky-800 font-bold">Drop</p>
+                <p class="text-[11px] text-slate-600 mt-1">雙膝跪地壓低重心避免跌倒</p>
+              </div>
+              <div class="bg-indigo-50 border-2 border-indigo-300 rounded-xl p-3">
+                <span class="text-2xl block mb-1">🛡️</span>
+                <p class="font-black text-sm text-indigo-950">2. 掩護</p>
+                <p class="text-[11px] text-indigo-800 font-bold">Cover</p>
+                <p class="text-[11px] text-slate-600 mt-1">躲入堅固桌下或用書包護頭頸</p>
+              </div>
+              <div class="bg-teal-50 border-2 border-teal-300 rounded-xl p-3">
+                <span class="text-2xl block mb-1">✊</span>
+                <p class="font-black text-sm text-teal-950">3. 穩住</p>
+                <p class="text-[11px] text-teal-800 font-bold">Hold on</p>
+                <p class="text-[11px] text-slate-600 mt-1">緊握桌腳直至搖晃完全停止</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 pt-1">
+              <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">⏸️</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-slate-900">階段一（搖晃劇烈時）：就地趴下、掩護、穩住，遠離玻璃窗</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    劇烈搖晃時切勿衝向門口或樓梯（容易被掉落天花板、玻璃或推擠砸傷），立即躲在堅固課桌下或柱旁，背對玻璃窗並保護頭頸部。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">🌳</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-emerald-900">階段二（搖晃停止後）：關閉電源/火源，不搭電梯，疏散至戶外空曠處</h4>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    確認搖晃停止後，隨手關閉實驗室火源與電源，攜帶書包護頭、<strong>嚴禁搭乘電梯</strong>，依序走安全梯疏散至<strong>戶外空曠處（如大草坪、廣場）</strong>，並遠離建築物外牆磁磚與玻璃帷幕。
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
+                <span class="text-xl shrink-0 mt-0.5">📋</span>
+                <div class="space-y-1">
+                  <h4 class="font-black text-sm sm:text-base text-amber-950">階段三（抵達戶外集合點後）：清點人數，確認受困或建物損壞再行通報</h4>
+                  <p class="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                    抵達戶外安全集合點後先清點班級或實驗室人數；若自己能安全撤離請在戶外撥打校安中心通報，<strong>僅限建物倒塌、門框變形導致人員受困室內無法逃生時</strong>，才使用「受困回報位置及人數」通知救援。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 頁尾校安中心聯絡資訊 -->
+      <footer class="bg-slate-900 text-slate-300 px-4 py-3.5 text-xs flex flex-wrap items-center justify-between gap-2">
+      <!-- =================================================================== -->
+      <section id="view-guide" class="tab-view hidden space-y-4">
+        <!-- 滅火器四步驟互動卡片 + 中文語音導覽 -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-amber-400">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-fire-extinguisher"></i>
+              </span>
+              <div>
+                <h3 class="text-base sm:text-lg font-black text-slate-900">滅火器操作四步驟 (PASS 原則)</h3>
+                <p class="text-xs text-slate-500 font-medium">1. 拔插銷 ➔ 2. 瞄準火源底部 ➔ 3. 壓把手 ➔ 4. 掃射</p>
+              </div>
+            </div>
+            <button id="voiceGuideBtn" onclick="speakExtinguisherSteps()" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow flex items-center gap-1.5 transition cursor-pointer">
+              <span>🔊</span>
+              <span id="voiceGuideText">語音導覽</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div id="step-card-1" class="step-card rounded-xl bg-slate-50 border border-slate-200 p-3 text-center transition-all">
+              <div class="w-8 h-8 rounded-full bg-red-600 text-white font-black text-sm flex items-center justify-center mx-auto mb-1.5">1</div>
+              <p class="font-black text-sm text-slate-900">1. 拔插銷</p>
+              <p class="text-xs text-slate-600 mt-1">提起滅火器，用力拉開安全插銷</p>
+            </div>
+            <div id="step-card-2" class="step-card rounded-xl bg-slate-50 border border-slate-200 p-3 text-center transition-all">
+              <div class="w-8 h-8 rounded-full bg-orange-600 text-white font-black text-sm flex items-center justify-center mx-auto mb-1.5">2</div>
+              <p class="font-black text-sm text-slate-900">2. 瞄準火源底部</p>
+              <p class="text-xs text-slate-600 mt-1">握住噴管前端，瞄準火焰最底部</p>
+            </div>
+            <div id="step-card-3" class="step-card rounded-xl bg-slate-50 border border-slate-200 p-3 text-center transition-all">
+              <div class="w-8 h-8 rounded-full bg-amber-600 text-white font-black text-sm flex items-center justify-center mx-auto mb-1.5">3</div>
+              <p class="font-black text-sm text-slate-900">3. 壓把手</p>
+              <p class="text-xs text-slate-600 mt-1">用力壓下手壓柄，噴出乾粉藥劑</p>
+            </div>
+            <div id="step-card-4" class="step-card rounded-xl bg-slate-50 border border-slate-200 p-3 text-center transition-all">
+              <div class="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-sm flex items-center justify-center mx-auto mb-1.5">4</div>
+              <p class="font-black text-sm text-slate-900">4. 掃射</p>
+              <p class="text-xs text-slate-600 mt-1">由近而遠左右移動掃射直至撲滅</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 災前預防檢查 & 災中逃生原則 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2.5">
+            <h3 class="text-base font-black text-ncnuBlue flex items-center gap-2">
+              <i class="fa-solid fa-clipboard-check text-blue-600"></i>
+              <span>災前預防檢查</span>
+            </h3>
+            <ul class="space-y-2 text-xs sm:text-sm text-slate-700">
+              <li class="bg-slate-50 p-2.5 rounded-xl"><strong>✔ 確認滅火器壓力錶：</strong>指針必須保持在綠色正常範圍，且未超過檢修期限（115-08-29）。</li>
+              <li class="bg-slate-50 p-2.5 rounded-xl"><strong>✔ 保持走廊與樓梯轉彎處淨空：</strong>嚴禁在安全梯間與消防栓箱前堆放物品。</li>
+              <li class="bg-slate-50 p-2.5 rounded-xl"><strong>✔ 用電安全管理：</strong>離開教室或研究室前關閉不必要電源，避免延長線過載。</li>
+            </ul>
+          </div>
+
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2.5">
+            <h3 class="text-base font-black text-red-700 flex items-center gap-2">
+              <i class="fa-solid fa-person-running text-red-600"></i>
+              <span>災中逃生原則</span>
+            </h3>
+            <ul class="space-y-2 text-xs sm:text-sm text-slate-700">
+              <li class="bg-rose-50 p-2.5 rounded-xl"><strong>🚫 絕不搭乘電梯：</strong>教育學院 4F 右側電梯於火警時嚴禁搭乘，避免斷電受困。</li>
+              <li class="bg-emerald-50 p-2.5 rounded-xl"><strong>🏃 低姿勢沿綠色動線往 3F 疏散：</strong>沿地面約 30 公分低姿勢前進，依綠色箭頭前往左右安全梯往下疏散至 3F 與 1F。</li>
+              <li class="bg-amber-50 p-2.5 rounded-xl"><strong>🚪 濃煙關門待援：</strong>若門外已有濃煙，立即關門塞住門縫，並利用本系統「受困人數回報」通知校安中心。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- 分頁四：防災互動小遊戲（滅火器實戰模擬 + 教育學院 4F 五題快問快答）       -->
+      <!-- =================================================================== -->
+      <section id="view-game" class="tab-view hidden space-y-4">
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">互動式消防演練</span>
+              <h3 class="text-base sm:text-lg font-black text-ncnuBlue mt-1">教育學院 4F 防災大挑戰</h3>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-500 block">目前防災積分</span>
+              <span id="gameScoreDisplay" class="text-xl font-black text-orange-600">0 分</span>
+            </div>
+          </div>
+
+          <!-- 兩階段關卡進度條 -->
+          <div class="flex items-center gap-2 mb-4">
+            <div id="stage1Pill" class="flex-1 text-center py-2 rounded-xl text-xs sm:text-sm font-black bg-orange-600 text-white">
+              關卡一：滅火器實戰模擬器
+            </div>
+            <div id="stage2Pill" class="flex-1 text-center py-2 rounded-xl text-xs sm:text-sm font-black bg-slate-200 text-slate-600">
+              關卡二：教育學院 4F 防災快問快答 (5題)
+            </div>
+          </div>
+
+          <!-- 關卡一：燃燒垃圾桶滅火模擬 -->
+          <div id="game-stage-1" class="space-y-4">
+            <div class="bg-slate-900 rounded-2xl p-4 text-center relative overflow-hidden">
+              <p class="text-xs sm:text-sm text-amber-300 font-bold mb-2">
+                情境模擬：教育學院 4F 休息區垃圾桶不慎起火！請依正確 PASS 順序點擊下方 4 個動作撲滅火勢：
+              </p>
+
+              <!-- 燃燒垃圾桶與火焰 SVG -->
+              <div class="h-44 flex items-end justify-center relative">
+                <svg viewBox="0 0 260 140" class="w-64 h-40">
+                  <rect x="20" y="122" width="220" height="8" rx="4" fill="#475569" />
+                  <!-- 垃圾桶本體 -->
+                  <polygon points="104,84 156,84 150,122 110,122" fill="#64748b" stroke="#cbd5e1" stroke-width="2" />
+                  <rect x="100" y="79" width="60" height="6" rx="2" fill="#94a3b8" />
+                  <!-- 火焰群組 -->
+                  <g id="gameFireGroup" class="flame-anim">
+                    <path d="M 130 16 C 156 48, 158 79, 130 82 C 102 79, 104 48, 130 16 Z" fill="#ef4444" />
+                    <path d="M 130 34 C 146 56, 148 79, 130 81 C 112 79, 114 56, 130 34 Z" fill="#f97316" />
+                    <path d="M 130 52 C 138 66, 140 79, 130 80 C 120 79, 122 66, 130 52 Z" fill="#facc15" />
+                  </g>
+                  <!-- 乾粉噴射效果 -->
+                  <g id="gameSprayGroup" class="hidden">
+                    <path d="M 42 74 L 122 68 L 122 86 Z" fill="#f1f5f9" opacity="0.9" />
+                    <circle cx="96" cy="75" r="6" fill="white" />
+                    <circle cx="114" cy="72" r="8" fill="white" />
+                    <circle cx="128" cy="79" r="7" fill="white" />
+                  </g>
+                </svg>
+              </div>
+
+              <div id="stage1Feedback" class="mt-2 text-xs sm:text-sm font-bold text-white bg-white/10 py-2 px-3 rounded-xl">
+                請點選第 1 個正確步驟！
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <button onclick="handleExtAction('AIM')" class="p-3.5 rounded-xl bg-slate-100 hover:bg-orange-100 border-2 border-slate-300 font-black text-xs sm:text-sm text-slate-800 transition cursor-pointer">
+                🎯 瞄準火源底部
+              </button>
+              <button onclick="handleExtAction('PULL')" class="p-3.5 rounded-xl bg-slate-100 hover:bg-orange-100 border-2 border-slate-300 font-black text-xs sm:text-sm text-slate-800 transition cursor-pointer">
+                🪝 拔插銷
+              </button>
+              <button onclick="handleExtAction('SWEEP')" class="p-3.5 rounded-xl bg-slate-100 hover:bg-orange-100 border-2 border-slate-300 font-black text-xs sm:text-sm text-slate-800 transition cursor-pointer">
+                🧹 掃射
+              </button>
+              <button onclick="handleExtAction('SQUEEZE')" class="p-3.5 rounded-xl bg-slate-100 hover:bg-orange-100 border-2 border-slate-300 font-black text-xs sm:text-sm text-slate-800 transition cursor-pointer">
+                ✊ 壓把手
+              </button>
+            </div>
+          </div>
+
+          <!-- 關卡二：教育學院 4F 防災快問快答（5題） -->
+          <div id="game-stage-2" class="hidden space-y-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+              <span id="quizProgressText" class="text-xs font-black text-blue-700">第 1 / 5 題</span>
+              <h4 id="quizQuestionText" class="text-base font-black text-slate-900 mt-1 leading-snug"></h4>
+            </div>
+
+            <div id="quizOptionsContainer" class="space-y-2.5"></div>
+
+            <div id="quizExplanationBox" class="hidden rounded-xl p-3.5 text-xs sm:text-sm font-bold leading-relaxed"></div>
+          </div>
+
+          <!-- 通關頒獎畫面 -->
+          <div id="game-complete" class="hidden text-center py-6 space-y-4">
+            <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 text-amber-900 flex items-center justify-center text-4xl mx-auto shadow-lg border-4 border-amber-500">
+              <i class="fa-solid fa-medal"></i>
+            </div>
+            <div>
+              <span class="text-xs font-black bg-amber-100 text-amber-800 px-3 py-1 rounded-full">演練通關認證</span>
+              <h4 class="text-xl font-black text-ncnuBlue mt-2">恭喜獲得「暨大教育學院 4F 防災達人」徽章！</h4>
+              <p id="finalScoreSummary" class="text-sm font-bold text-slate-600 mt-1">總積分：100 / 100 分</p>
+            </div>
+            <button onclick="resetGame()" class="bg-ncnuBlue hover:bg-slate-800 text-white font-black px-6 py-2.5 rounded-xl shadow cursor-pointer">
+              <i class="fa-solid fa-rotate-right mr-1.5"></i>重新挑戰
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 頁尾校安中心聯絡資訊 -->
+    <footer class="bg-slate-900 text-slate-300 px-4 py-3.5 text-xs flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <p class="font-bold text-white">國立暨南國際大學 校務防災中心 / 校安中心 24H 專線</p>
+        <p class="text-slate-400">緊急專線：049-2910960 ｜ 校內分機：2419</p>
+      </div>
+      <span class="text-[11px] bg-white/10 px-2.5 py-1 rounded-lg text-slate-300">教育學院 A棟 4F 專屬防災頁面</span>
+    </footer>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- 彈窗一：QR Code 貼紙預覽（張貼於教育學院 4F 設備旁）                      -->
+  <!-- =================================================================== -->
+  <div id="qrModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 shadow-2xl relative my-auto">
+      <button onclick="closeQrModal()" class="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <p class="text-xs font-black text-slate-600 text-center mb-2.5">張貼於教育學院 4F 設備旁（可掃描開啟）</p>
+
+      <!-- 實際可掃描之公開網址設定區 -->
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <label for="qrTargetUrlInput" class="text-xs font-black text-ncnuBlue">
+            <i class="fa-solid fa-link mr-1"></i>綁定公開網址（外部掃描用）
+          </label>
+          <button type="button" onclick="useCurrentPageUrl()" class="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer">
+            帶入目前網址
+          </button>
+        </div>
+        <div class="flex gap-1.5">
+          <input
+            type="url"
+            id="qrTargetUrlInput"
+            oninput="refreshRealQrCode()"
+            placeholder="https://你的帳號.github.io/ncnu-4f-safety/"
+            class="flex-1 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-red-500 focus:outline-none"
+          />
+          <button type="button" onclick="copyQrTargetUrl()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-2.5 py-1.5 rounded-xl cursor-pointer shrink-0">
+            複製
+          </button>
+        </div>
+        <p id="qrUrlStatusHint" class="text-[11px] text-amber-700 font-medium leading-snug">
+          提示：請先將本 HTML 檔上傳至公開空間（如 GitHub Pages），再將網址貼入上方即可讓外部手機掃碼進入。
+        </p>
+      </div>
+
+      <!-- 紅色災害掃碼貼紙主體 -->
+      <div id="qrStickerCard" class="bg-[#DC2626] rounded-2xl p-5 text-center shadow-inner border-4 border-red-800">
+        <div class="bg-white p-3 rounded-xl inline-block shadow-md">
+          <div id="realQrCodeBox" class="w-40 h-40 flex items-center justify-center"></div>
+        </div>
+        <h3 class="text-2xl font-black text-slate-950 tracking-wider mt-3.5">發生災害請掃我</h3>
+        <p class="text-xs font-extrabold text-slate-900 mt-1.5 bg-white/35 inline-block px-3 py-1 rounded-full">
+          張貼於教育學院 4F 設備旁
+        </p>
+      </div>
+
+      <div class="mt-3.5 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-xs text-slate-600">定位代碼：<code class="bg-slate-100 px-2 py-0.5 rounded font-mono text-red-600 font-bold">NCNU-EDU-A-4F</code></p>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="downloadQrCodePng()" class="bg-ncnuBlue hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer">
+            <i class="fa-solid fa-download mr-1"></i>下載 QR 圖檔
+          </button>
+          <button type="button" onclick="window.print()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer">
+            <i class="fa-solid fa-print mr-1"></i>列印
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- 彈窗二：通用訊息提示框（取代原生 alert）                                -->
+  <!-- =================================================================== -->
+  <div id="customModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center space-y-3">
+      <div id="modalIcon" class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mx-auto">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h4 id="modalTitle" class="text-lg font-black text-slate-900">通報已送出</h4>
+      <p id="modalBody" class="text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">內容</p>
+      <button onclick="closeCustomModal()" class="w-full bg-ncnuBlue hover:bg-slate-800 text-white font-black py-2.5 rounded-xl cursor-pointer">
+        確定
+      </button>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- JavaScript 完整互動邏輯                                              -->
+  <!-- =================================================================== -->
+  <script>
+    // 1. 教育學院 A棟 4F 完整設備資料庫（16支滅火器、3座消防栓、2台SOS、2台飲水機、4座逃生梯、3座樓梯、1座電梯）
+    const EQUIPMENT_DB = {
+      'EXT-4F-01': { name: 'ABC 乾粉滅火器 (10型)', loc: '上方左側走廊 #1', expiry: '115-08-29', selectVal: 'EXT-4F-01' },
+      'EXT-4F-02': { name: 'ABC 乾粉滅火器 (10型)', loc: '上方左側走廊 #2', expiry: '115-08-29', selectVal: 'EXT-4F-02' },
+      'EXT-4F-03': { name: 'ABC 乾粉滅火器 (10型)', loc: '左側走廊 SOS 上方牆邊 #1', expiry: '115-08-29', selectVal: 'EXT-4F-03' },
+      'EXT-4F-04': { name: 'ABC 乾粉滅火器 (10型)', loc: '左側走廊 SOS 上方牆邊 #2', expiry: '115-08-29', selectVal: 'EXT-4F-04' },
+      'EXT-4F-05': { name: 'ABC 乾粉滅火器 (10型)', loc: '中左教室下方走廊牆面 #1', expiry: '115-08-29', selectVal: 'EXT-4F-05' },
+      'EXT-4F-06': { name: 'ABC 乾粉滅火器 (10型)', loc: '中左教室下方走廊牆面 #2', expiry: '115-08-29', selectVal: 'EXT-4F-06' },
+      'EXT-4F-07': { name: 'ABC 乾粉滅火器 (10型)', loc: '下方中央四間教室上方走廊 #1', expiry: '115-08-29', selectVal: 'EXT-4F-07' },
+      'EXT-4F-08': { name: 'ABC 乾粉滅火器 (10型)', loc: '下方中央四間教室上方走廊 #2', expiry: '115-08-29', selectVal: 'EXT-4F-08' },
+      'EXT-4F-09': { name: 'ABC 乾粉滅火器 (10型)', loc: '中右教室下方走廊牆面 #1', expiry: '115-08-29', selectVal: 'EXT-4F-09' },
+      'EXT-4F-10': { name: 'ABC 乾粉滅火器 (10型)', loc: '中右教室下方走廊牆面 #2', expiry: '115-08-29', selectVal: 'EXT-4F-10' },
+      'EXT-4F-11': { name: 'ABC 乾粉滅火器 (10型)', loc: '上方右側走廊 #1', expiry: '115-08-29', selectVal: 'EXT-4F-11' },
+      'EXT-4F-12': { name: 'ABC 乾粉滅火器 (10型)', loc: '上方右側走廊 #2', expiry: '115-08-29', selectVal: 'EXT-4F-12' },
+      'EXT-4F-13': { name: 'ABC 乾粉滅火器 (10型)', loc: '上方右側走廊 #3', expiry: '115-08-29', selectVal: 'EXT-4F-13' },
+      'EXT-4F-14': { name: 'ABC 乾粉滅火器 (10型)', loc: '右側走廊 SOS 上方牆邊', expiry: '115-08-29', selectVal: 'EXT-4F-14' },
+      'EXT-4F-15': { name: 'ABC 乾粉滅火器 (10型)', loc: '左側逃生樓梯轉彎處', expiry: '115-08-29', selectVal: 'EXT-4F-15' },
+      'EXT-4F-16': { name: 'ABC 乾粉滅火器 (10型)', loc: '右側逃生樓梯轉彎處', expiry: '115-08-29', selectVal: 'EXT-4F-16' },
+      'HYD-4F-01': { name: '第一種室內消防栓箱', loc: '左側廁所前消防栓', expiry: '115-08-29', selectVal: 'HYD-4F-01' },
+      'HYD-4F-02': { name: '第一種室內消防栓箱', loc: '中央主樓梯前消防栓', expiry: '115-08-29', selectVal: 'HYD-4F-02' },
+      'HYD-4F-03': { name: '第一種室內消防栓箱', loc: '右側廁所前消防栓', expiry: '115-08-29', selectVal: 'HYD-4F-03' },
+      'SOS-4F-01': { name: 'SOS 校安緊急對講電話', loc: '左側教室走廊轉角處', expiry: '115-08-29', selectVal: 'SOS-4F-01' },
+      'SOS-4F-02': { name: 'SOS 校安緊急對講電話', loc: '右側教室走廊轉角處', expiry: '115-08-29', selectVal: 'SOS-4F-02' },
+      'WAT-4F-01': { name: '冰溫熱飲水機 #1', loc: '中左教室下方入口旁', expiry: '115-08-29', selectVal: 'EXT-4F-05' },
+      'WAT-4F-02': { name: '冰溫熱飲水機 #2', loc: '右側電梯下方入口旁', expiry: '115-08-29', selectVal: 'EXT-4F-10' },
+      'ELEV-01': { name: '客用電梯（火災嚴禁搭乘）', loc: '中右區域電梯間', expiry: '115-08-29', selectVal: 'EXIT-4F-RIGHT' },
+      'STAIR-CENTER': { name: '中央半圓形主樓梯 (通往 3F)', loc: '中央休息區前方', expiry: '115-08-29', selectVal: 'HYD-4F-02' },
+      'STAIR-LEFT': { name: '左側安全逃生樓梯 (往下通往 3F)', loc: '左側廁所旁逃生梯', expiry: '115-08-29', selectVal: 'EXIT-4F-LEFT' },
+      'STAIR-RIGHT': { name: '右側安全逃生樓梯 (往下通往 3F)', loc: '右側廁所旁逃生梯', expiry: '115-08-29', selectVal: 'EXIT-4F-RIGHT' },
+      'ESC-4F-01': { name: '北側逃生出口節點 #1', loc: '上方左側走廊盡頭', expiry: '115-08-29', selectVal: 'EXIT-4F-LEFT' },
+      'ESC-4F-02': { name: '北側逃生出口節點 #2', loc: '中央休息區左上方', expiry: '115-08-29', selectVal: 'EXIT-4F-LEFT' },
+      'ESC-4F-03': { name: '北側逃生出口節點 #3', loc: '中央休息區右上方', expiry: '115-08-29', selectVal: 'EXIT-4F-RIGHT' },
+      'ESC-4F-04': { name: '北側逃生出口節點 #4', loc: '上方右側走廊盡頭', expiry: '115-08-29', selectVal: 'EXIT-4F-RIGHT' }
+    };
+
+    let selectedEquipmentId = null;
+    let currentZoom = 1;
+    let activeFilter = null;
+    let trappedHeadcount = 1;
+
+    // Web Audio API 緊急警鈴狀態
+    let audioCtx = null;
+    let alarmTimer = null;
+    let isAlarmPlaying = false;
+
+    // localStorage 持久化通報紀錄
+    const STORAGE_KEY = 'ncnu_edu_4f_reports_v2';
+    const DEFAULT_REPORTS = [
+      {
+        id: 'NCNU-115-0412',
+        type: 'equipment',
+        title: '【EXT-4F-15 左側逃生樓梯轉彎處滅火器】壓力錶指針偏低檢查',
+        location: '教育學院 A棟 4樓',
+        time: '2026/11/24 14:20',
+        status: '總務處已派員檢修中'
+      },
+      {
+        id: 'NCNU-115-0398',
+        type: 'equipment',
+        title: '【HYD-4F-02 中央主樓梯前消防栓】箱門鉸鏈潤滑保養',
+        location: '教育學院 A棟 4樓',
+        time: '2026/11/20 09:45',
+        status: '已完成檢修結案'
+      }
+    ];
+
+    function loadReports() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return [...DEFAULT_REPORTS];
+    }
+
+    function saveReports(list) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      } catch (e) {}
+    }
+
+    let reportHistory = loadReports();
+
+    // 2. 即時時鐘
+    function updateClock() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('liveClock').textContent = `${y}/${m}/${d} ${hh}:${mm}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // 3. 樓層切換
+    function handleFloorChange(floor) {
+      document.getElementById('currentLocationTitle').textContent = `📍 你的位置：教育學院 A棟 ${floor}`;
+      document.getElementById('mapHeaderTitle').textContent = `教育學院 A 棟 ${floor} 防災設備分布圖`;
+      document.getElementById('repBuildingFloor').value = `教育學院 A棟 ${floor.replace('F', '樓')}`;
+    }
+
+    // 4. Web Audio API 緊急火警求救鈴
+    function toggleEmergencyBell() {
+      const btn = document.getElementById('alarmBellBtn');
+      const text = document.getElementById('alarmBellText');
+
+      if (!isAlarmPlaying) {
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!audioCtx) audioCtx = new AudioContextClass();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+
+          let isHigh = true;
+          const playPulse = () => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(isHigh ? 960 : 720, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.22);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.23);
+            isHigh = !isHigh;
+          };
+
+          playPulse();
+          alarmTimer = setInterval(playPulse, 260);
+        } catch (e) {}
+
+        isAlarmPlaying = true;
+        btn.classList.add('siren-active');
+        text.textContent = '停止求救鈴（已連線校安中心）';
+
+        showCustomModal(
+          '🚨 緊急求救鈴已啟動！',
+          '系統已發出高頻火警求救聲響提醒周邊師生，並同步發送定位座標至「國立暨南國際大學 校務防災中心 / 校安中心 (049-2910960)」。\n\n若遭濃煙受困，請立即點擊「受困人數回報」回報教室與人數！',
+          'danger'
+        );
+      } else {
+        clearInterval(alarmTimer);
+        isAlarmPlaying = false;
+        btn.classList.remove('siren-active');
+        text.textContent = '求救鈴（啟動高頻警示音）';
+      }
+    }
+
+    // 5. 四大主分頁切換
+    function switchTab(tabName, subTab = null) {
+      const targetView = document.getElementById(`view-${tabName}`);
+      if (!targetView) return;
+
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+      targetView.classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-ncnuBlue', 'text-white', 'shadow');
+        btn.classList.add('bg-slate-100', 'text-slate-700');
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-slate-100', 'text-slate-700');
+        activeBtn.classList.add('bg-ncnuBlue', 'text-white', 'shadow');
+      }
+
+      if (tabName === 'report' && subTab) {
+        switchReportSubTab(subTab);
+      }
+    }
+
+    // 防災宣導主分類切換（一般火災宣導 vs 地震防災宣導）
+    function switchGuideCategory(category) {
+      const firePanel = document.getElementById('guide-panel-fire');
+      const eqPanel = document.getElementById('guide-panel-earthquake');
+      const fireBtn = document.getElementById('guide-cat-fire');
+      const eqBtn = document.getElementById('guide-cat-earthquake');
+
+      if (category === 'fire') {
+        firePanel.classList.remove('hidden');
+        eqPanel.classList.add('hidden');
+        fireBtn.className = 'py-3.5 px-4 rounded-xl text-sm sm:text-base font-black transition flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-md cursor-pointer';
+        eqBtn.className = 'py-3.5 px-4 rounded-xl text-sm sm:text-base font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer';
+      } else {
+        eqPanel.classList.remove('hidden');
+        firePanel.classList.add('hidden');
+        eqBtn.className = 'py-3.5 px-4 rounded-xl text-sm sm:text-base font-black transition flex items-center justify-center gap-2 bg-gradient-to-r from-sky-700 to-indigo-700 text-white shadow-md cursor-pointer';
+        fireBtn.className = 'py-3.5 px-4 rounded-xl text-sm sm:text-base font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer';
+      }
+    }
+
+    // 防災宣導細項切換（災前預防 vs 災中應變與逃生）
+    function switchGuideSubStage(category, stage) {
+      const preDetail = document.getElementById(`${category}-detail-pre`);
+      const duringDetail = document.getElementById(`${category}-detail-during`);
+      const preBtn = document.getElementById(`${category}-sub-pre`);
+      const duringBtn = document.getElementById(`${category}-sub-during`);
+
+      const activeTextClass = category === 'fire' ? 'text-orange-700' : 'text-sky-800';
+      const inactiveTextClass = category === 'fire' ? 'text-orange-900/70 hover:text-orange-950' : 'text-sky-900/70 hover:text-sky-950';
+
+      if (stage === 'pre') {
+        preDetail.classList.remove('hidden');
+        duringDetail.classList.add('hidden');
+        preBtn.className = `py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition bg-white ${activeTextClass} shadow cursor-pointer`;
+        duringBtn.className = `py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition ${inactiveTextClass} cursor-pointer`;
+      } else {
+        duringDetail.classList.remove('hidden');
+        preDetail.classList.add('hidden');
+        duringBtn.className = `py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition bg-white ${activeTextClass} shadow cursor-pointer`;
+        preBtn.className = `py-2.5 px-3 rounded-xl text-xs sm:text-sm font-black transition ${inactiveTextClass} cursor-pointer`;
+      }
+    }
+
+    function switchReportSubTab(sub) {
+      const eqPanel = document.getElementById('report-panel-equipment');
+      const trPanel = document.getElementById('report-panel-trapped');
+      const eqBtn = document.getElementById('subtab-equipment');
+      const trBtn = document.getElementById('subtab-trapped');
+
+      if (sub === 'equipment') {
+        eqPanel.classList.remove('hidden');
+        trPanel.classList.add('hidden');
+        eqBtn.classList.add('bg-white', 'text-ncnuBlue', 'shadow');
+        eqBtn.classList.remove('text-slate-600');
+        trBtn.classList.remove('bg-white', 'text-red-700', 'shadow');
+        trBtn.classList.add('text-slate-600');
+      } else {
+        trPanel.classList.remove('hidden');
+        eqPanel.classList.add('hidden');
+        trBtn.classList.add('bg-white', 'text-red-700', 'shadow');
+        trBtn.classList.remove('text-slate-600');
+        eqBtn.classList.remove('bg-white', 'text-ncnuBlue', 'shadow');
+        eqBtn.classList.add('text-slate-600');
+      }
+    }
+
+    // 6. 平面圖縮放與圖例高亮篩選（避免 transform 位移，直接調整寬度確保置中不跑版）
+    function zoomMap(delta) {
+      currentZoom = Math.min(2.0, Math.max(0.8, +(currentZoom + delta).toFixed(1)));
+      applyZoom();
+    }
+
+    function resetMapZoom() {
+      currentZoom = 1;
+      applyZoom();
+    }
+
+    function applyZoom() {
+      const svg = document.getElementById('floorPlanSvg');
+      const container = document.getElementById('mapScrollContainer');
+      document.getElementById('zoomLevelLabel').textContent = `${Math.round(currentZoom * 100)}%`;
+
+      if (currentZoom === 1) {
+        svg.style.width = '100%';
+        svg.style.maxWidth = '900px';
+        container.classList.add('justify-center');
+      } else {
+        svg.style.maxWidth = 'none';
+        svg.style.width = `${Math.round(900 * currentZoom)}px`;
+        if (currentZoom > 1) {
+          container.classList.remove('justify-center');
+        } else {
+          container.classList.add('justify-center');
+        }
+      }
+    }
+
+    function toggleFilter(category) {
+      document.querySelectorAll('.marker-highlight').forEach(el => el.classList.remove('marker-highlight'));
+      document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50'));
+
+      if (activeFilter === category) {
+        activeFilter = null;
+        return;
+      }
+
+      activeFilter = category;
+      const chip = document.getElementById(`filter-${category}`);
+      if (chip) chip.classList.add('ring-2', 'ring-orange-500', 'bg-orange-50');
+
+      const targets = document.querySelectorAll(`.equip-${category} circle, .equip-${category} rect, .equip-${category} path`);
+      targets.forEach(node => node.classList.add('marker-highlight'));
+    }
+
+    // 7. 點擊平面圖設備顯示檢視卡並可一鍵帶入異常通報
+    function selectEquipment(id) {
+      const info = EQUIPMENT_DB[id];
+      if (!info) return;
+      selectedEquipmentId = id;
+
+      document.getElementById('detailBadge').textContent = id;
+      document.getElementById('detailName').textContent = info.name;
+      document.getElementById('detailLocation').textContent = `位置：教育學院 A棟 4F ${info.loc}`;
+      document.getElementById('detailExpiry').innerHTML = `<i class="fa-regular fa-calendar-check text-emerald-400 mr-1.5"></i>檢修有效期限：${info.expiry}`;
+
+      const card = document.getElementById('equipmentDetailCard');
+      card.classList.remove('hidden');
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeEquipmentDetail() {
+      document.getElementById('equipmentDetailCard').classList.add('hidden');
+    }
+
+    function reportSelectedEquipment() {
+      if (!selectedEquipmentId) return;
+      const info = EQUIPMENT_DB[selectedEquipmentId];
+      switchTab('report', 'equipment');
+      if (info && info.selectVal) {
+        document.getElementById('repEquipmentSelect').value = info.selectVal;
+      }
+      document.getElementById('repDetailText').focus();
+    }
+
+    // 8. 照片上傳預覽與表單送出
+    function handlePhotoPreview(event) {
+      const file = event.target.files && event.target.files[0];
+      const nameEl = document.getElementById('photoFileName');
+      const previewBox = document.getElementById('photoPreviewBox');
+      const previewImg = document.getElementById('photoPreviewImg');
+
+      if (!file) {
+        nameEl.textContent = '尚未選擇照片（選填）';
+        previewBox.classList.add('hidden');
+        return;
+      }
+
+      nameEl.textContent = file.name;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        previewImg.src = e.target.result;
+        previewBox.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function formatNowDateTime() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      return `${y}/${m}/${d} ${hh}:${mm}`;
+    }
+
+    function submitEquipmentReport(event) {
+      event.preventDefault();
+      const loc = document.getElementById('repBuildingFloor').value;
+      const selectEl = document.getElementById('repEquipmentSelect');
+      const equipText = selectEl.options[selectEl.selectedIndex].text;
+      const tags = Array.from(document.querySelectorAll('input[name="issueTag"]:checked')).map(el => el.value);
+      const detail = document.getElementById('repDetailText').value.trim();
+
+      const summaryParts = [];
+      if (tags.length > 0) summaryParts.push(tags.join('、'));
+      if (detail) summaryParts.push(detail);
+      const issueDesc = summaryParts.length > 0 ? summaryParts.join('；') : '設備異常待檢修';
+
+      const receiptId = `NCNU-115-${String(Math.floor(1000 + Math.random() * 9000))}`;
+      const newRecord = {
+        id: receiptId,
+        type: 'equipment',
+        title: `【${equipText}】${issueDesc}`,
+        location: loc,
+        time: formatNowDateTime(),
+        status: '已派單至總務處營繕組'
+      };
+
+      reportHistory.unshift(newRecord);
+      saveReports(reportHistory);
+      renderReportHistory();
+
+      event.target.reset();
+      document.getElementById('repBuildingFloor').value = loc;
+      document.getElementById('photoFileName').textContent = '尚未選擇照片（選填）';
+      document.getElementById('photoPreviewBox').classList.add('hidden');
+
+      showCustomModal(
+        '✅ 設備異常通報已送出',
+        `通報單號：${receiptId}\n位置：${loc}\n設備：${equipText}\n狀況：${issueDesc}\n\n系統已通知國立暨南國際大學總務處與校安中心處理。`,
+        'success'
+      );
+    }
+
+    function adjustTrappedCount(delta) {
+      trappedHeadcount = Math.min(20, Math.max(1, trappedHeadcount + delta));
+      document.getElementById('trappedCountDisplay').textContent =
+        trappedHeadcount === 20 ? '20+ 人' : `${trappedHeadcount} 人`;
+    }
+
+    function submitTrappedReport(event) {
+      event.preventDefault();
+      const room = document.getElementById('trapRoom').value;
+      const countText = trappedHeadcount === 20 ? '20+ 人' : `${trappedHeadcount} 人`;
+      const statuses = Array.from(document.querySelectorAll('input[name="trapStatus"]:checked')).map(el => el.value);
+      const statusDesc = statuses.length > 0 ? statuses.join('、') : '無法逃生受困待援';
+
+      const receiptId = `SOS-${String(Math.floor(1000 + Math.random() * 9000))}`;
+      const newRecord = {
+        id: receiptId,
+        type: 'trapped',
+        title: `【受困 ${countText}】${room}（${statusDesc}）`,
+        location: room,
+        time: formatNowDateTime(),
+        status: '🚨 緊急救援已通報校安中心與 119'
+      };
+
+      reportHistory.unshift(newRecord);
+      saveReports(reportHistory);
+      renderReportHistory();
+
+      showCustomModal(
+        '🚨 受困位置與人數已緊急回報！',
+        `救援案號：${receiptId}\n受困位置：${room}\n受困人數：${countText}\n現場狀況：${statusDesc}\n\n已優先傳送至「國立暨南國際大學 校務防災中心 / 校安中心 (049-2910960)」，請保持冷靜、關門塞縫並留意對外窗或手機通訊。`,
+        'danger'
+      );
+    }
+
+    function renderReportHistory() {
+      const listEl = document.getElementById('reportHistoryList');
+      const badgeEl = document.getElementById('reportCountBadge');
+      badgeEl.textContent = `共 ${reportHistory.length} 筆`;
+
+      if (!reportHistory.length) {
+        listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-3">目前尚無通報紀錄</p>';
+        return;
+      }
+
+      listEl.innerHTML = reportHistory.map(item => {
+        const isTrapped = item.type === 'trapped';
+        return `
+          <div class="p-3 rounded-xl border ${isTrapped ? 'bg-red-50/70 border-red-200' : 'bg-slate-50 border-slate-200'} flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="space-y-0.5">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-mono font-black ${isTrapped ? 'text-red-700' : 'text-ncnuBlue'}">${item.id}</span>
+                <span class="text-slate-400">•</span>
+                <span class="text-slate-500">${item.time}</span>
+              </div>
+              <p class="text-xs sm:text-sm font-bold text-slate-800">${item.title}</p>
+            </div>
+            <span class="text-[11px] font-black px-2.5 py-1 rounded-full self-start sm:self-center whitespace-nowrap ${isTrapped ? 'bg-red-600 text-white' : 'bg-emerald-100 text-emerald-800'}">
+              ${item.status}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+    renderReportHistory();
+
+    // 9. 滅火器附錄語音口訣朗讀
+    let isSpeaking = false;
+    let voiceHighlightTimer = null;
+
+    function clearStepHighlights() {
+      document.querySelectorAll('.step-card').forEach(card => {
+        card.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50', 'scale-105');
+      });
+    }
+
+    function speakExtinguisherSteps() {
+      const btnText = document.getElementById('voiceGuideText');
+      if (isSpeaking) {
+        try {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        } catch (e) {}
+        clearTimeout(voiceHighlightTimer);
+        clearStepHighlights();
+        isSpeaking = false;
+        btnText.textContent = '語音口訣';
+        return;
+      }
+
+      const script = '初期小火滅火器操作口訣：一、拉，拉開安全插銷；二、瞄，瞄準火源底部；三、壓，用力壓下手柄；四、掃，左右掃射撲滅。若火勢變大或濃煙蔓延，請立即往戶外安全處逃生。';
+      isSpeaking = true;
+      btnText.textContent = '停止朗讀';
+
+      clearStepHighlights();
+      const step1 = document.getElementById('step-card-1');
+      if (step1) step1.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'scale-105');
+      voiceHighlightTimer = setTimeout(() => {
+        clearStepHighlights();
+        const step2 = document.getElementById('step-card-2');
+        if (step2) step2.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'scale-105');
+      }, 2200);
+
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(script);
+          utter.lang = 'zh-TW';
+          utter.rate = 1.0;
+          utter.onend = () => {
+            clearTimeout(voiceHighlightTimer);
+            clearStepHighlights();
+            isSpeaking = false;
+            btnText.textContent = '語音口訣';
+          };
+          utter.onerror = () => {
+            clearTimeout(voiceHighlightTimer);
+            clearStepHighlights();
+            isSpeaking = false;
+            btnText.textContent = '語音口訣';
+          };
+          window.speechSynthesis.speak(utter);
+        } else {
+          setTimeout(() => {
+            clearStepHighlights();
+            isSpeaking = false;
+            btnText.textContent = '語音口訣';
+          }, 5000);
+        }
+      } catch (e) {
+        clearStepHighlights();
+        isSpeaking = false;
+        btnText.textContent = '語音口訣';
+      }
+    }
+
+    // 10. 災前整備與減災防災測驗（7 題：涵蓋 4 題參考圖題目 + 3 題校園減災與避難整備題）
+    const PREPAREDNESS_QUIZ = [
+      {
+        q: '1. 當發生強烈地震，人剛好在室內，最正確的「趴下、掩護、穩住」口訣中，首要動作是哪一個？',
+        options: [
+          'A. 立刻往屋外跑或搭乘電梯離開',
+          'B. 立即趴下，並用雙手或堅固物品保護頭部和頸部',
+          'C. 趕快衝到廚房關閉瓦斯總開關',
+          'D. 站在房屋中央或門框底下祈禱'
+        ],
+        answer: 1,
+        hint: '強烈搖晃時移動極易跌倒或遭掉落物砸傷，第一時間應就地降低重心並護住最脆弱的部位。',
+        explain: 'Correct! 地震劇烈搖晃時切勿慌張奔跑或搭乘電梯，應立即「趴下（Drop）」降低重心，並「掩護（Cover）」保護頭頸部，再「穩住（Hold on）」抓緊桌腳直到搖晃停止。'
+      },
+      {
+        q: '2. 如果地震發生時你正在「床上」，周圍沒有桌子可以躲藏，此時最正確的應變方式為何？',
+        options: [
+          'A. 迅速跳下床，跑到客廳找堅固的桌子',
+          'B. 立刻打開大門大聲呼救',
+          'C. 留在床上，將身體蜷縮，並用枕頭保護頭、頸部，直到地震結束',
+          'D. 躲進衣櫃裡避免玻璃割傷'
+        ],
+        answer: 2,
+        hint: '睡眠或躺在床上時，下床走動反而容易踩到散落玻璃或被傾倒家具壓傷，善用手邊軟墊物品即可。',
+        explain: 'Correct! 若人在床上且無桌可躲，留在床上趴下或側臥蜷縮、用枕頭保護頭頸部，是最安全且不易受傷的做法。'
+      },
+      {
+        q: '3. 地震發生後下列何者錯誤？',
+        options: [
+          'A. 須（應）以保護「自身安全」為第一優先。',
+          'B. 選擇未固定的書櫃旁黃金三角躲藏。',
+          'C. 確認家人、同事、鄰居的安危。',
+          'D. 確保出口暢通。'
+        ],
+        answer: 1,
+        hint: '災前整備強調「家具固定」；未固定的高大櫃體在主震或餘震時極易傾倒砸人，躲在未固定書櫃旁反而最危險！',
+        explain: 'Correct! 「未固定的書櫃」在地震或餘震中極易傾倒壓傷人，絕對不可躲在其旁邊；災前應先固定大型書櫃，災時採「趴下、掩護、穩住」躲在堅固桌下或遠離傾倒物處。'
+      },
+      {
+        q: '4. 關於用電安全，下列哪一項行為最容易引發電氣火災？',
+        options: [
+          'A. 定期清潔插頭上的積汙導電灰塵',
+          'B. 將高功率電器（如微波爐、電暖器、吹風機）同時插在同一條延長線上使用',
+          'C. 選購具有「商品檢驗標示」與「過載自動斷電保護」的延長線',
+          'D. 睡覺或長期出門前拔掉不常用電器的插頭'
+        ],
+        answer: 1,
+        hint: '災前減災的日常觀察重點在於「負載容量」與「積汙導電」，高耗電發熱電器若共用插座會使電線溫度急劇飆升。',
+        explain: 'Correct! 高功率電器消耗電流大，同時插在同一條延長線上極易超過負載上限，導致絕緣外皮熔毀起火；平時也應定期擦拭插頭灰塵避免「積汙導電」。'
+      },
+      {
+        q: '5. 平時在教室、研究室或宿舍進行「災前整備與日常觀察」時，下列哪一項發現代表存在嚴重防災隱憂，應立即改善或通報？',
+        options: [
+          'A. 安全門與逃生樓梯間保持淨空、未堆放紙箱或雜物',
+          'B. 常閉式防火門被師生用磚頭、木楔抵住保持敞開，或走廊堆滿舊書櫃',
+          'C. 座位上方無懸掛重物，且高處書櫃已妥善固定',
+          'D. 延長線電線完整無捆綁，且插頭無發燙或焦黑痕跡'
+        ],
+        answer: 1,
+        hint: '火災中最致命的往往不是火舌而是「濃煙」，阻斷濃煙蔓延的關鍵設施平時必須維持可正常閉合。',
+        explain: 'Correct! 常閉式防火門若被物品卡住無法閉合，火災時濃煙會瞬間灌入樓梯間（煙囪效應），阻斷全樓層人員的逃生生路；逃生梯與防火門前平時皆應保持淨空。'
+      },
+      {
+        q: '6. 在校園內發生火災或地震需要通報求援時，關於「逃生與通報」的正確先後觀念為何？',
+        options: [
+          'A. 留在濃煙密布的走廊慢慢填寫線上表單，再決定要不要逃生',
+          'B. 搭乘電梯快速下樓，一邊在電梯內撥打電話',
+          'C. 能逃生時優先走安全梯往「戶外空曠處」疏散，到達戶外再通報；僅限受困無法逃生時才在安全處回報受困位置',
+          'D. 為了收拾筆電與貴重物品，先返回教室再前往集合點'
+        ],
+        answer: 2,
+        hint: '保命永遠優先於財物與行政通報；只有在逃生路徑受阻無法撤離時，才需要啟動「受困位置回報」。',
+        explain: 'Correct! 災害發生時「能逃生就先往戶外空曠處跑」，切勿搭乘電梯或折返拿物品，抵達戶外安全處再撥打 119 或校安專線；只有當濃煙或瓦礫阻斷去路無法逃生時，才使用受困回報功能讓救援人員掌握位置。'
+      },
+      {
+        q: '7. 為了減少地震發生時的「非結構性傷害」（如掉落物砸傷、玻璃割傷），平時在辦公室或教室最適合採取哪項減災整備？',
+        options: [
+          'A. 將最重的資料箱與字典放在高處書櫃最頂層',
+          'B. 調整座位與床鋪位置，避開大片玻璃窗及未固定的高櫃，並在玻璃貼上防爆膜',
+          'C. 把緊急避難包鎖在深處儲藏櫃最底層',
+          'D. 地震發生前不需要事先確認建築物有幾座逃生樓梯'
+        ],
+        answer: 1,
+        hint: '減災整備的核心是「讓重物往下放、讓危險物品遠離活動區、讓逃生出口保持兩方向以上」。',
+        explain: 'Correct! 地震多數傷亡來自家具傾倒、高處重物掉落與玻璃碎裂。平時應落實「重物放低處、高櫃要固定、座位避開玻璃窗」，並將緊急避難包放在隨手可拿的出口處。'
+      }
+    ];
+
+    let currentQuizIdx = 0;
+    let quizResults = new Array(PREPAREDNESS_QUIZ.length).fill(null); // null | { selectedIdx, isCorrect }
+    let isCurrentAnswered = false;
+
+    function renderQuizProgressBar() {
+      const barEl = document.getElementById('quizSegmentedBar');
+      const total = PREPAREDNESS_QUIZ.length;
+      document.getElementById('quizCounterText').textContent = `${currentQuizIdx + 1} / ${total}`;
+
+      const correctCount = quizResults.filter(r => r && r.isCorrect).length;
+      document.getElementById('gameScoreDisplay').textContent = `${correctCount} / ${total} 題`;
+
+      barEl.innerHTML = quizResults.map((res, idx) => {
+        const isCurrent = idx === currentQuizIdx;
+        if (res === null) {
+          return `
+            <div class="flex flex-col items-center">
+              <div class="h-4 flex items-center justify-center text-[11px] font-black text-transparent">•</div>
+              <div class="w-full h-1.5 rounded-full ${isCurrent ? 'bg-blue-600' : 'bg-slate-200'} transition-colors"></div>
+            </div>
+          `;
+        } else if (res.isCorrect) {
+          return `
+            <div class="flex flex-col items-center">
+              <div class="h-4 flex items-center justify-center text-xs font-black text-emerald-600">✓</div>
+              <div class="w-full h-1.5 rounded-full bg-blue-600"></div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="flex flex-col items-center">
+              <div class="h-4 flex items-center justify-center text-xs font-black text-rose-600">✕</div>
+              <div class="w-full h-1.5 rounded-full bg-blue-600"></div>
+            </div>
+          `;
+        }
+      }).join('');
+    }
+
+    function renderQuizQuestion() {
+      isCurrentAnswered = false;
+      const qObj = PREPAREDNESS_QUIZ[currentQuizIdx];
+      renderQuizProgressBar();
+
+      document.getElementById('quizQuestionText').textContent = qObj.q;
+      document.getElementById('quizHintText').textContent = qObj.hint;
+      document.getElementById('quizHintBox').classList.add('hidden');
+      document.getElementById('quizHintChevron').classList.remove('rotate-180');
+
+      const nextBtn = document.getElementById('nextQuestionBtn');
+      nextBtn.classList.add('hidden');
+      nextBtn.classList.remove('inline-flex');
+      document.getElementById('nextQuestionBtnLabel').textContent =
+        currentQuizIdx === PREPAREDNESS_QUIZ.length - 1 ? '查看測驗結果' : '下一題';
+
+      const container = document.getElementById('quizOptionsContainer');
+      container.innerHTML = qObj.options.map((opt, idx) => `
+        <button type="button" onclick="selectQuizOption(${idx})" id="quiz-opt-${idx}" class="w-full text-left p-4 rounded-2xl bg-slate-100 hover:bg-slate-200/80 border-2 border-transparent text-sm sm:text-base font-bold text-slate-900 transition cursor-pointer">
+          <div class="leading-snug">${opt}</div>
+          <div id="quiz-opt-feedback-${idx}" class="hidden mt-2 text-xs sm:text-sm font-medium leading-relaxed"></div>
+        </button>
+      `).join('');
+    }
+    // 11. 彈窗控制與真實可掃描 QR Code 產生器
+    const QR_URL_STORAGE_KEY = 'ncnu_edu_4f_public_url_v1';
+    let qrInstance = null;
+
+    function getDefaultQrUrl() {
+      try {
+        const saved = localStorage.getItem(QR_URL_STORAGE_KEY);
+        if (saved && saved.trim()) return saved.trim();
+      } catch (e) {}
+
+      try {
+        const href = window.location.href || '';
+        if (href.startsWith('http://') || href.startsWith('https://')) {
+          return href;
+        }
+      } catch (e) {}
+
+      return 'https://ncnu-edu.github.io/edu-a-4f-fire-safety/';
+    }
+
+    function refreshRealQrCode() {
+      const inputEl = document.getElementById('qrTargetUrlInput');
+      const boxEl = document.getElementById('realQrCodeBox');
+      const hintEl = document.getElementById('qrUrlStatusHint');
+      if (!inputEl || !boxEl || typeof QRCode === 'undefined') return;
+
+      const rawUrl = (inputEl.value || '').trim() || 'https://ncnu-edu.github.io/edu-a-4f-fire-safety/';
+      try {
+        localStorage.setItem(QR_URL_STORAGE_KEY, rawUrl);
+      } catch (e) {}
+
+      boxEl.innerHTML = '';
+      qrInstance = new QRCode(boxEl, {
+        text: rawUrl,
+        width: 160,
+        height: 160,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+
+      if (hintEl) {
+        if (rawUrl.startsWith('https://')) {
+          hintEl.className = 'text-[11px] text-emerald-700 font-bold leading-snug';
+          hintEl.textContent = '✓ 已產生 HTTPS 網址 QR Code，發布至該網址後外部手機即可直接掃描進入。';
+        } else {
+          hintEl.className = 'text-[11px] text-amber-700 font-medium leading-snug';
+          hintEl.textContent = '提示：建議填入完整的 https:// 開頭公開網址，方便外部手機順利掃描開啟。';
+        }
+      }
+    }
+
+    function useCurrentPageUrl() {
+      const inputEl = document.getElementById('qrTargetUrlInput');
+      const href = window.location.href || '';
+      if (href.startsWith('http://') || href.startsWith('https://')) {
+        inputEl.value = href;
+        refreshRealQrCode();
+      } else {
+        showCustomModal(
+          '目前為本機檔案模式',
+          '目前網頁尚未部署至公開網址（網址為本機或預覽沙盒）。\n\n建議將本 HTML 檔上傳至免費的 GitHub Pages 或學校伺服器取得 https:// 網址後，再貼入上方欄位產生外部可掃描的 QR Code！',
+          'success'
+        );
+      }
+    }
+
+    function copyQrTargetUrl() {
+      const inputEl = document.getElementById('qrTargetUrlInput');
+      if (!inputEl || !inputEl.value) return;
+      inputEl.select();
+      try {
+        document.execCommand('copy');
+        showCustomModal('已複製網址', `已複製綁定網址：\n${inputEl.value}`, 'success');
+      } catch (e) {}
+    }
+
+    function downloadQrCodePng() {
+      const boxEl = document.getElementById('realQrCodeBox');
+      if (!boxEl) return;
+      const canvas = boxEl.querySelector('canvas');
+      const img = boxEl.querySelector('img');
+      let dataUrl = '';
+
+      if (canvas && typeof canvas.toDataURL === 'function') {
+        dataUrl = canvas.toDataURL('image/png');
+      } else if (img && img.src) {
+        dataUrl = img.src;
+      }
+
+      if (!dataUrl) return;
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = 'NCNU-EDU-A-4F-QRCode.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openQrModal() {
+      const inputEl = document.getElementById('qrTargetUrlInput');
+      if (inputEl && !inputEl.value) {
+        inputEl.value = getDefaultQrUrl();
+      }
+      document.getElementById('qrModal').classList.remove('hidden');
+      refreshRealQrCode();
+    }
+    function closeQrModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+
+    function showCustomModal(title, body, type = 'success') {
+      const iconBox = document.getElementById('modalIcon');
+      if (type === 'danger') {
+        iconBox.className = 'w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto';
+        iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      } else {
+        iconBox.className = 'w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mx-auto';
+        iconBox.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+      }
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').textContent = body;
+      document.getElementById('customModal').classList.remove('hidden');
+    }
+
+    function closeCustomModal() {
+      document.getElementById('customModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
